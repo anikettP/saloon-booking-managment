@@ -1,0 +1,482 @@
+/* index.css — Solid PINK theme only */
+
+/* Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Prata&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap');
+
+.heading-font { font-family: 'Dancing Script', cursive; }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------
+   Theme variables (ALL PINK)
+   -------------------------------- */
+:root {
+  /* Base */
+  --color-bg: #fcbebe;          /* light pink page */
+  --color-surface: #ffffff;     /* cards/surfaces */
+  --color-text: #9d174d;        /* deep pink text (rose-700) */
+  --color-muted: #be185d;       /* mid pink for secondary text */
+
+  /* Brand */
+  --color-primary: #ec4899;     /* pink-500 */
+  --color-accent:  #f472b6;     /* pink-400 (hover/soft) */
+  --color-secondary:#be185d;    /* pink-700 (strong/dark) */
+
+  /* tokens */
+  --frame-gap: 6px;
+  --hero-radius: 1rem;
+  --hero-shadow: 0 12px 40px rgba(236, 72, 153, 0.18);
+}
+
+/* Optional same-pink theme alias */
+.theme-warm {
+  --color-bg: #fff1f2;
+  --color-surface: #ffffff;
+  --color-text: #9d174d;
+  --color-muted: #be185d;
+  --color-primary: #ec4899;
+  --color-accent:  #f472b6;
+  --color-secondary:#be185d;
+}
+
+/* Dark mode (pink tuned for dark) */
+.dark {
+  --color-bg: #0b0a0c;
+  --color-surface: #111014;
+  --color-text: #fbcfe8;        /* light pink text */
+  --color-muted: #f9a8d4;
+
+  --color-primary: #f472b6;     /* softer pink */
+  --color-accent:  #fb7185;     /* rose-400 */
+  --color-secondary:#e11d48;    /* rose-600 */
+}
+
+
+
+
+
+
+
+
+
+
+/* ------------------------------------------------------------
+   ✅ UPDATED: GLOBAL BACKGROUND WITH ZOOMED PATTERN
+   ------------------------------------------------------------ */
+html, body {
+  /* 1. Fallback color */
+  background-color: var(--color-bg);
+  
+  /* 2. Pink Overlay (92% Opacity) */
+  background-image: 
+    linear-gradient(
+      rgba(252, 190, 190, 0.80),  
+      rgba(252, 190, 190, 0.80)
+    ),
+    url('/wowwooliesbg.webp'); 
+
+  /* 3. Pattern Logic: Zoomed in by 20% */
+  background-repeat: repeat;      
+  
+  /* 500px + 20% = 600px */
+  background-size: 800px auto;    
+  
+  background-position: center top;
+  background-attachment: fixed;   
+
+  /* Text colors */
+  color: var(--color-text);
+  
+  transition: background-color 240ms ease, color 240ms ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden !important;
+}
+
+
+
+
+
+
+
+/* Global font families */
+* {
+  font-family: 'Outfit', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  box-sizing: border-box;
+}
+
+/* Prata font helper */
+.prata-regular { font-family: "Prata", serif; font-weight: 400; font-style: normal; }
+
+/* Scrollbar hide */
+::-webkit-scrollbar { display: none; }
+
+/* Small screen tweaks */
+@media (max-width:640px) {
+  a.active { background-color: var(--color-secondary); color: #fff; }
+}
+
+/* --------------------------------
+   Brand utilities (text/bg/border)
+   -------------------------------- */
+.text-brand        { color: var(--color-primary); }
+.text-brand-accent { color: var(--color-accent); }
+.text-brand-strong { color: var(--color-secondary); }
+
+.bg-brand          { background-color: var(--color-primary); }
+.bg-brand-accent   { background-color: var(--color-accent); }
+.bg-brand-strong   { background-color: var(--color-secondary); }
+
+.border-brand        { border-color: var(--color-primary); }
+.border-brand-accent { border-color: var(--color-accent); }
+.border-brand-strong { border-color: var(--color-secondary); }
+
+/* Backward-compatibility aliases */
+.text-warm-primary, .text-brand-blue, .text-brand-yellow { color: var(--color-primary); }
+
+/* Solid brand button */
+.btn-brand {
+  background: var(--color-primary);
+  color: #ffffff;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.6rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 8px 26px rgba(236,72,153,0.25);
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.btn-brand:hover  { background: var(--color-secondary); }
+.btn-brand:active { transform: translateY(1px); box-shadow: 0 6px 18px rgba(236,72,153,0.18); }
+
+/* Links & headings go pink automatically */
+a { color: var(--color-primary); }
+a:hover { color: var(--color-secondary); }
+h1, h2, h3, h4, h5, h6 { color: var(--color-secondary); }
+
+/* --------------------------------
+   Outer frame + hero helpers
+   -------------------------------- */
+.outer-gradient-frame {
+  display: block;
+  padding: var(--frame-gap);
+  border-radius: calc(var(--hero-radius) + 6px);
+  background: var(--color-primary); /* PINK frame */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.hero-card {
+  background: var(--color-surface);
+  border-radius: var(--hero-radius);
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--hero-shadow);
+  transition: transform 320ms cubic-bezier(.16,.84,.31,1), box-shadow 320ms ease, opacity 240ms ease;
+}
+.hero-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 60px rgba(236,72,153,0.30);
+}
+
+/* subtle pink tint (optional) */
+.hero-overlay-warm {
+  background: linear-gradient(0deg, rgba(236,72,153,0.10), rgba(236,72,153,0.0));
+  transition: opacity 360ms ease, transform 360ms ease;
+}
+
+/* --------------------------------
+   Animations
+   -------------------------------- */
+@keyframes whiteFade { 0% {opacity:1;} 100% {opacity:0;} }
+.animate-whiteFade { animation: whiteFade 3s ease-out forwards; }
+
+@keyframes fadeInScale { from {opacity:0; transform:scale(1.25);} to {opacity:1; transform:scale(1);} }
+.animate-fadeInScale { animation: fadeInScale 700ms ease-out forwards; }
+
+@keyframes fadeInUp { from {opacity:0; transform:translateY(8px);} to {opacity:1; transform:translateY(0);} }
+.animate-fadeInUp { animation: fadeInUp 700ms ease forwards; }
+
+/* --------------------------------
+   Carousel-specific
+   -------------------------------- */
+.carousel-viewport { perspective: 1400px; -webkit-perspective: 1400px; overflow: hidden; }
+.carousel-track { transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
+.carousel-img {
+  filter: none !important;
+  -webkit-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.bg-cover-center { background-size: cover; background-position: center; background-repeat: no-repeat; }
+
+/* --------------------------------
+   Misc helpers
+   -------------------------------- */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(236,72,153,0.35); /* pink glow */
+  border-radius: 6px;
+}
+.hide-sm { display: block; }
+@media (max-width: 640px) { .hide-sm { display: none; } }
+
+
+h1 {
+  color: #ffffff !important; /* force white */
+}
+
+p {
+  color: #5e002af2 !important;
+}
+
+/* Make the description text in Latest Collection section white */
+.latest-collection-text {
+  color: white;
+  font-weight: 500;
+  line-height: 1.6;
+  text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.4); /* optional for better contrast */
+}
+
+/* --------------------------------
+   Navbar height compatibility and main-content padding
+   -------------------------------- */
+
+/* Remove default margins and ensure background covers entire viewport */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  background-color: var(--color-bg) !important; /* ensures gutter uses same pink */
+  overflow-x: hidden !important;                 /* prevent accidental horizontal scroll */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Make sure root wrapper uses box-sizing and matches nav padding */
+/* UPDATED: remove heavy padding, keep layout wide */
+#root > div {
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  /* only safe-area, no extra 16px app padding */
+  padding-left: env(safe-area-inset-left, 0px) !important;
+  padding-right: env(safe-area-inset-right, 0px) !important;
+  max-width: 100% !important;
+}
+
+/* Force navbar to use the same 16px left/right offset and not touch edges
+   (KEEPING THIS AS YOU REQUESTED) */
+body > nav,
+nav {
+  left: calc(env(safe-area-inset-left, 0px) + 16px) !important;
+  right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+  max-width: calc(100% - 32px) !important;
+  width: auto !important;
+  margin: 0 auto !important;
+  top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+  z-index: 99999 !important;
+  overflow: visible !important;
+  isolation: isolate !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+/* Small screens - keep slightly larger safe gap ONLY for nav-safe root wrapper */
+@media (max-width: 420px) {
+  #root > div {
+    padding-left: env(safe-area-inset-left, 0px) !important;
+    padding-right: env(safe-area-inset-right, 0px) !important;
+  }
+  body > nav,
+  nav {
+    left: calc(env(safe-area-inset-left, 0px) + 18px) !important;
+    right: calc(env(safe-area-inset-right, 0px) + 18px) !important;
+    max-width: calc(100% - 36px) !important;
+  }
+}
+
+/* FIX: Do NOT target #root > div (breaks internal grids)
+   UPDATED: give only ~5px global padding, not 16px */
+#root {
+  padding-left: calc(env(safe-area-inset-left, 0px) + 5px) !important;
+  padding-right: calc(env(safe-area-inset-right, 0px) + 5px) !important;
+  box-sizing: border-box !important;
+}
+
+/* 🌸 Navbar link styling (dark pink theme) */
+.nav-link {
+  color: #b30059; /* dark pink */
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  position: relative;
+  transition: color 0.3s ease, transform 0.2s ease;
+}
+
+/* hover + active effect */
+.nav-link:hover {
+  color: #f6f6f6; /* lighter pink hover */
+  transform: translateY(-2px);
+}
+
+/* underline effect animation */
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background-color: #ffffff;
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+
+
+/* ============================================
+   GLOBAL SPACING FIX — 15px SAFE PADDING
+   Overrides earlier rules without breaking nav
+   ============================================ */
+
+html, body {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  overflow-x: hidden !important;
+}
+
+/* Main root wrapper — apply global padding */
+#root {
+  padding-left: 15px !important;
+  padding-right: 15px !important;
+  box-sizing: border-box !important;
+}
+
+/* Prevent inner auto-padding from breaking layout */
+#root > div {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Keep NAVBAR EXACTLY as before (unchanged) */
+nav,
+body > nav {
+  position: relative;
+  z-index: 99999 !important;
+  max-width: calc(100% - 32px) !important;
+  left: calc(env(safe-area-inset-left, 0px) + 16px) !important;
+  right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* src/index.css (Add to the end of the file) */
+
+/* The drawing animation for the SVG path */
+.checkmark-path {
+  stroke-dasharray: 100; /* The total length of the path (approx) */
+  stroke-dashoffset: 100; /* Start hidden */
+  animation: draw-checkmark 0.6s ease-in-out forwards 0.3s; /* Wait 0.3s then draw over 0.6s */
+}
+
+@keyframes draw-checkmark {
+  to {
+    stroke-dashoffset: 0; /* End fully drawn */
+  }
+}
+
+/* Utility Animations for the popup entrance */
+@keyframes scale-up {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-scale-up {
+  animation: scale-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0); }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+.animate-pop-in {
+    animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slide-up-fade {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up-fade {
+    animation: slide-up-fade 0.4s ease-out forwards;
+    opacity: 0; /* Start invisible so delay works */
+}
+.delay-300 { animation-delay: 300ms; }
+.delay-500 { animation-delay: 500ms; }
+
+@keyframes ping-slow {
+    75%, 100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+.animate-ping-slow {
+    animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+
+
+
+
+

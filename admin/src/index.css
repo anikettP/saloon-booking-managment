@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*{
+    font-family: Outfit;
+}
+
+select,input,textarea{
+    border: 1px solid #c2c2c2;
+    outline-color: #C586A5;
+    border-radius: 4px;
+}
+
+.active{
+    background-color: #ffebf5;
+    border-color: #C586A5;
+}
+
+
+
+/* simple slide animation effect */
+.slide-left {
+  animation: slideLeft 0.3s ease-in-out;
+}
+.slide-right {
+  animation: slideRight 0.3s ease-in-out;
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-15px); }
+}
+
+@keyframes slideRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(15px); }
+}
+
+
+
+
+/* add to your global stylesheet (e.g. index.css) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;                /* top:0; right:0; bottom:0; left:0; */
+  display: flex;
+  align-items: center;     /* vertical center */
+  justify-content: center; /* horizontal center */
+  background: rgba(0,0,0,0.45);
+  z-index: 1000;
+}
+
+.modal-content {
+  width: 90%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(2,6,23,0.2);
+  padding: 20px;
+  position: relative;
+}
