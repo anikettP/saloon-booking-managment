@@ -24,8 +24,13 @@ const ManageSalon = () => {
     city: "",
     state: "",
     pincode: "",
-    description: ""
+    pincode: "",
+    description: "",
+    isActive: true,
+    coordinates: { lat: "", lng: "" }
   });
+  
+  const [editingSvcId, setEditingSvcId] = useState(null);
   
   const [services, setServices] = useState([]);
   const [artists, setArtists] = useState([]);
@@ -63,9 +68,12 @@ const ManageSalon = () => {
           location: s.location || "",
           address: s.address || "",
           city: s.city || "",
+          city: s.city || "",
           state: s.state || "",
           pincode: s.pincode || "",
-          description: s.description || ""
+          description: s.description || "",
+          isActive: s.isActive !== undefined ? s.isActive : true,
+          coordinates: s.coordinates || { lat: "", lng: "" }
         });
         setServices(res.data.services || []);
         setArtists(s.artists || []);
@@ -109,6 +117,21 @@ const ManageSalon = () => {
     }
   };
 
+  const handleRemoveArtist = async (artistId) => {
+    try {
+      const res = await axios.post(`${backendUrl}/api/salons/artist/remove`, 
+        { salonId: salon._id, artistId },
+        { headers: { authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        toast.success("Artist removed!");
+        setArtists(artists.filter(a => a._id !== artistId));
+      }
+    } catch {
+      toast.error("Failed to remove artist");
+    }
+  };
+
   const handleAddService = async () => {
     if (!newSvc.name || !newSvc.price) return;
     try {
@@ -123,6 +146,24 @@ const ManageSalon = () => {
       }
     } catch {
       toast.error("Error adding service");
+    }
+  };
+
+  const handleUpdateService = async () => {
+    if (!newSvc.name || !newSvc.price) return;
+    try {
+      const res = await axios.put(`${backendUrl}/api/services/${editingSvcId}`, 
+        newSvc,
+        { headers: { authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        toast.success("Service updated!");
+        setServices(services.map(s => s._id === editingSvcId ? res.data.service : s));
+        setNewSvc({ name: "", price: "", duration: "60", category: "Hair" });
+        setEditingSvcId(null);
+      }
+    } catch {
+      toast.error("Error updating service");
     }
   };
 
@@ -405,6 +446,54 @@ const ManageSalon = () => {
                     />
                     <p className="text-[9px] text-rose-950/20 mt-3 font-black uppercase tracking-widest">Connect to global navigation for the "Find Nearby" experience.</p>
                   </div>
+                  
+                  <div className="col-span-full bg-[#FFFBFA] p-8 rounded-3xl border border-rose-100 flex flex-col md:flex-row gap-6 items-center justify-between">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-black text-rose-950/50 uppercase tracking-[0.3em] mb-4">GPS Coordinates</label>
+                      <div className="flex gap-4">
+                        <input 
+                          type="number" step="any" placeholder="Latitude" value={basicInfo.coordinates?.lat} 
+                          onChange={e => setBasicInfo({...basicInfo, coordinates: {...basicInfo.coordinates, lat: e.target.value}})}
+                          className="flex-1 bg-white border border-rose-100 rounded-2xl px-6 py-4 text-xs font-black text-rose-950 focus:ring-1 focus:ring-rose-600 outline-none" 
+                        />
+                        <input 
+                          type="number" step="any" placeholder="Longitude" value={basicInfo.coordinates?.lng} 
+                          onChange={e => setBasicInfo({...basicInfo, coordinates: {...basicInfo.coordinates, lng: e.target.value}})}
+                          className="flex-1 bg-white border border-rose-100 rounded-2xl px-6 py-4 text-xs font-black text-rose-950 focus:ring-1 focus:ring-rose-600 outline-none" 
+                        />
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            pos => setBasicInfo({...basicInfo, coordinates: { lat: pos.coords.latitude, lng: pos.coords.longitude }}),
+                            () => toast.error("Location access denied")
+                          );
+                        } else toast.error("Geolocation not supported");
+                      }}
+                      className="bg-rose-50 text-rose-600 border border-rose-200 px-6 py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all mt-4 md:mt-0 shadow-sm"
+                    >
+                      <MapPin size={14} className="inline mr-2" /> Detect Location
+                    </button>
+                  </div>
+
+                  <div className="col-span-full flex items-center justify-between bg-white border border-rose-100 p-8 rounded-3xl shadow-sm">
+                    <div>
+                      <p className="text-[10px] font-black text-rose-950 uppercase tracking-[0.3em]">Public Visibility</p>
+                      <p className="text-[9px] text-rose-950/40 font-bold uppercase tracking-widest mt-1">Make your salon visible in the discovery feed</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={basicInfo.isActive} 
+                        onChange={e => setBasicInfo({...basicInfo, isActive: e.target.checked})}
+                      />
+                      <div className="w-14 h-7 bg-rose-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-rose-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-rose-600 shadow-inner"></div>
+                    </label>
+                  </div>
                 <div>
                   <label className="block text-[10px] font-black text-rose-950/30 uppercase tracking-[0.3em] mb-4">Support Contact</label>
                   <input 
@@ -560,7 +649,7 @@ const ManageSalon = () => {
                 </div>
 
                 <div className="bg-[#0A0A0A] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative overflow-hidden group">
-                  <p className="text-[10px] font-black text-gold/60 uppercase tracking-[0.3em] mb-8">Deploy New Treatment</p>
+                  <p className="text-[10px] font-black text-gold/60 uppercase tracking-[0.3em] mb-8">{editingSvcId ? "Update Treatment" : "Deploy New Treatment"}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <input 
                       type="text" placeholder="Treatment Name" value={newSvc.name} onChange={e => setNewSvc({...newSvc, name: e.target.value})}
@@ -574,9 +663,14 @@ const ManageSalon = () => {
                       type="number" placeholder="Duration (min)" value={newSvc.duration} onChange={e => setNewSvc({...newSvc, duration: e.target.value})}
                       className="bg-black border border-white/5 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-white focus:ring-1 focus:ring-gold outline-none"
                     />
-                    <button onClick={handleAddService} className="bg-gold text-black rounded-2xl font-black py-4 text-[10px] uppercase tracking-widest hover:bg-white transition shadow-2xl shadow-gold/10">
-                      Add to Menu
+                    <button onClick={editingSvcId ? handleUpdateService : handleAddService} className="bg-gold text-black rounded-2xl font-black py-4 text-[10px] uppercase tracking-widest hover:bg-white transition shadow-2xl shadow-gold/10">
+                      {editingSvcId ? "Save Updates" : "Add to Menu"}
                     </button>
+                    {editingSvcId && (
+                      <button onClick={() => { setEditingSvcId(null); setNewSvc({ name: "", price: "", duration: "60", category: "Hair" }); }} className="col-span-full md:col-auto bg-black text-white/50 border border-white/10 rounded-2xl font-black py-4 text-[10px] uppercase tracking-widest hover:text-white transition">
+                        Cancel Edit
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -593,9 +687,17 @@ const ManageSalon = () => {
                           <p className="text-[9px] text-white/30 font-black uppercase tracking-widest mt-1">₹{svc.price} · {svc.duration} Minutes</p>
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteService(svc._id)} className="p-4 text-white/20 hover:text-red-500 hover:bg-red-500/5 rounded-2xl transition-all">
-                        <Trash2 size={18} />
-                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          setEditingSvcId(svc._id);
+                          setNewSvc({ name: svc.name, price: svc.price, duration: svc.duration, category: svc.category || "Hair" });
+                        }} className="p-4 text-white/20 hover:text-gold hover:bg-gold/5 rounded-2xl transition-all">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteService(svc._id)} className="p-4 text-white/20 hover:text-red-500 hover:bg-red-500/5 rounded-2xl transition-all">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                   {services.length === 0 && (
@@ -648,6 +750,7 @@ const ManageSalon = () => {
                       <div className="flex flex-col items-end gap-2">
                          <span className="text-[8px] px-3 py-1 bg-rose-50 text-rose-600 font-black uppercase tracking-widest rounded-full border border-rose-100 shadow-xl">Verified</span>
                          <span className="text-[7px] text-rose-950/20 font-black uppercase tracking-[0.2em]">Active Duty</span>
+                         <button onClick={() => handleRemoveArtist(artist._id)} className="text-[8px] font-black uppercase tracking-widest text-red-500 hover:text-white hover:bg-red-500 px-3 py-1 rounded-full border border-red-100 transition-colors mt-2 shadow-sm">Remove</button>
                       </div>
                     </div>
                   ))}

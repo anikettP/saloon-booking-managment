@@ -14,6 +14,10 @@ const salonSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  coordinates: {
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null }
+  },
   address: {
     type: String,
     default: ""

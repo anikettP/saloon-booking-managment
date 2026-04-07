@@ -2,11 +2,22 @@ import React, { useContext, useState, useEffect } from "react";
 import { SalonContext } from "../context/SalonContext";
 import { MapPin, Search, Navigation, Info, ExternalLink, Calendar, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { calculateDistance } from "../utils/distance";
 
 const MapBooking = () => {
   const { salons, navigate } = useContext(SalonContext);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState("All");
+  const [userLocation, setUserLocation] = useState(null);
+  
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.log('Location access denied', err)
+      );
+    }
+  }, []);
   
   const cities = ["All", ...new Set(salons.map(s => s.city).filter(Boolean))];
 
@@ -63,21 +74,32 @@ const MapBooking = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-                 {filteredSalons.map((salon) => (
-                    <motion.div 
-                      key={salon._id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-xl hover:border-pink-200 transition-all group flex flex-col sm:flex-row gap-6"
-                    >
-                       <div className="w-full sm:w-44 h-44 rounded-2xl overflow-hidden shrink-0 shadow-lg relative">
-                          <img src={salon.images?.[0] || 'https://via.placeholder.com/300x300'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={salon.name} />
-                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
-                             <Star size={12} className="text-yellow-400 fill-yellow-400" />
-                             <span className="text-[10px] font-black">{salon.rating || 4.9}</span>
-                          </div>
-                       </div>
+                 {filteredSalons.map((salon) => {
+                    const dist = salon.coordinates?.lat && userLocation
+                      ? calculateDistance(userLocation.lat, userLocation.lng, salon.coordinates.lat, salon.coordinates.lng)
+                      : null;
+                    
+                    return (
+                        <motion.div 
+                          key={salon._id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-xl hover:border-pink-200 transition-all group flex flex-col sm:flex-row gap-6"
+                        >
+                           <div className="w-full sm:w-44 h-44 rounded-2xl overflow-hidden shrink-0 shadow-lg relative">
+                              <img src={salon.images?.[0] || 'https://via.placeholder.com/300x300'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={salon.name} />
+                              <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                 <Star size={12} className="text-yellow-400 fill-yellow-400" />
+                                 <span className="text-[10px] font-black">{salon.rating || 4.9}</span>
+                              </div>
+                              {dist !== null && (
+                                 <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm border border-pink-100">
+                                   <MapPin size={12} className="text-pink-600" />
+                                   <span className="text-[10px] font-black text-gray-900">{dist.toFixed(1)} km</span>
+                                 </div>
+                              )}
+                           </div>
 
                        <div className="flex-1 min-w-0 flex flex-col">
                           <div className="mb-auto">
@@ -110,7 +132,8 @@ const MapBooking = () => {
                           </div>
                        </div>
                     </motion.div>
-                 ))}
+                  );
+                 })}
                  {filteredSalons.length === 0 && (
                    <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-200">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4"><MapPin size={32} className="text-gray-300" /></div>
@@ -131,7 +154,10 @@ const MapBooking = () => {
                    style={{ border: 0, filter: 'grayscale(0.1) contrast(1.1)' }} 
                    loading="lazy" 
                    allowFullScreen 
-                   src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ''}&q=Salons+in+${selectedCity === "All" ? "Rajasthan" : selectedCity}`}
+                   src={userLocation 
+                     ? `https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ''}&q=Salons&center=${userLocation.lat},${userLocation.lng}&zoom=13`
+                     : `https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ''}&q=Salons+in+${selectedCity === "All" ? "Rajasthan" : selectedCity}`
+                   }
                  ></iframe>
                  
                  <div className="absolute top-6 left-6 right-6">

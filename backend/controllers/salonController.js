@@ -21,7 +21,7 @@ export const createSalon = async (req, res) => {
   try {
     const {
       name, description, location, address, city, state, pincode,
-      phone, email, categories, workingHours, slotDuration, workingDays, mapLink
+      phone, email, categories, workingHours, slotDuration, workingDays, mapLink, coordinates, isActive
     } = req.body;
 
     if (!name || !location || !city || !mapLink)
@@ -57,6 +57,8 @@ export const createSalon = async (req, res) => {
       workingHours: workingHours ? JSON.parse(workingHours) : { start: "09:00", end: "20:00" },
       slotDuration: slotDuration ? Number(slotDuration) : 60,
       workingDays: workingDays ? (Array.isArray(workingDays) ? workingDays : JSON.parse(workingDays)) : ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+      coordinates: coordinates ? (typeof coordinates === 'string' ? JSON.parse(coordinates) : coordinates) : undefined,
+      isActive: isActive !== undefined ? isActive : true,
       approved: false
     });
 
@@ -133,6 +135,8 @@ export const updateSalon = async (req, res) => {
       updates.workingHours = JSON.parse(updates.workingHours);
     if (updates.workingDays && typeof updates.workingDays === "string")
       updates.workingDays = JSON.parse(updates.workingDays);
+    if (updates.coordinates && typeof updates.coordinates === "string")
+      updates.coordinates = JSON.parse(updates.coordinates);
 
     // Upload new images if provided
     if (req.files?.length > 0) {
@@ -199,6 +203,37 @@ export const addArtist = async (req, res) => {
     }
 
     res.json({ success: true, message: "Artist added to salon", artist: { _id: artist._id, name: artist.name, email: artist.email } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── REMOVE ARTIST FROM SALON ────────────────────────────────────────────────
+export const removeArtist = async (req, res) => {
+  try {
+    const { salonId, artistId } = req.body;
+
+    const salon = await Salon.findById(salonId);
+    if (!salon)
+      return res.status(404).json({ success: false, message: "Salon not found" });
+
+    const isOwner = String(salon.owner) === String(req.user._id);
+    const isAdmin = req.user.role === "admin" || req.user.role === "superAdmin";
+
+    if (!isOwner && !isAdmin)
+      return res.status(403).json({ success: false, message: "Not authorized" });
+
+    salon.artists = salon.artists.filter(id => String(id) !== String(artistId));
+    await salon.save();
+
+    const artist = await User.findById(artistId);
+    if (artist) {
+      artist.salon = undefined;
+      artist.role = "customer";  // Downgrade to customer
+      await artist.save();
+    }
+
+    res.json({ success: true, message: "Artist removed from salon" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

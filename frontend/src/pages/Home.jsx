@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Scissors, Star, Clock, MapPin, ChevronRight, Sparkles } from 'lucide-react';
 import CampaignBanner from '../components/CampaignBanner';
+import { calculateDistance } from '../utils/distance';
 
 const Home = () => {
   const { salons, backendUrl, currency } = useContext(SalonContext);
@@ -14,6 +15,16 @@ const Home = () => {
   
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [userLocation, setUserLocation] = useState(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.log('Location access denied', err)
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const fetchBanners = async () => {
@@ -120,7 +131,7 @@ const Home = () => {
 
       {/* ─── FEATURED SALONS (Rose & Champagne) ─── */}
       <section className="py-32 px-6 sm:px-12 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-8">
           <div>
              <div className="flex items-center gap-3 text-rose-600 font-black uppercase tracking-[0.3em] text-[10px] mb-4">
                 <Sparkles size={16} /> Elite Collections
@@ -132,32 +143,69 @@ const Home = () => {
           </button>
         </div>
 
+        {/* Local Discovery Map Preview */}
+        {userLocation && (
+          <div className="mb-16 bg-white rounded-[3rem] p-6 border border-rose-100 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-4 right-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest text-rose-600 shadow-sm border border-rose-50 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span> GPS Active
+            </div>
+            <div className="aspect-[21/9] md:aspect-[32/9] rounded-[2rem] overflow-hidden bg-rose-50 border border-rose-50 relative">
+               <iframe 
+                 title="Local Discovery Map Preview"
+                 width="100%" 
+                 height="100%" 
+                 style={{ border: 0, filter: 'contrast(1.1) brightness(1.2)' }} 
+                 loading="lazy" 
+                 allowFullScreen 
+                 src={`https://www.google.com/maps/embed/v1/view?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ''}&center=${userLocation.lat},${userLocation.lng}&zoom=14`}
+               ></iframe>
+               <div className="absolute bottom-4 left-4 right-4 md:bottom-auto md:top-4 md:right-auto md:left-4">
+                  <button onClick={() => navigate('/map-booking')} className="bg-rose-600 text-white shadow-xl px-6 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition flex items-center gap-2">
+                     <MapPin size={14} /> Full Coverage Map
+                  </button>
+               </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex overflow-x-auto snap-x snap-mandatory gap-8 pb-12 no-scrollbar">
-          {featuredSalons.map((salon) => (
-            <div 
-              key={salon._id} 
-              onClick={() => navigate(`/salon/${salon._id}`)}
-              className="flex-none w-[300px] sm:w-[380px] snap-start group cursor-pointer bg-white rounded-[3.5rem] overflow-hidden border border-rose-50 shadow-xl hover:shadow-2xl hover:border-rose-100 transition-all duration-700"
-            >
-              <div className="relative aspect-[4/5] overflow-hidden">
-                <img 
-                  src={salon.images?.[0] || assets.salon_placeholder} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
-                  alt={salon.name} 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-40" />
-                <div className="absolute top-8 right-8 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black text-rose-600 shadow-2xl border border-rose-50">
-                  <Star size={12} className="fill-rose-600" />
-                  <span>4.9</span>
+          {featuredSalons.map((salon) => {
+            const dist = salon.coordinates?.lat && userLocation 
+              ? calculateDistance(userLocation.lat, userLocation.lng, salon.coordinates.lat, salon.coordinates.lng)
+              : null;
+
+            return (
+              <div 
+                key={salon._id} 
+                onClick={() => navigate(`/salon/${salon._id}`)}
+                className="flex-none w-[300px] sm:w-[380px] snap-start group cursor-pointer bg-white rounded-[3.5rem] overflow-hidden border border-rose-50 shadow-xl hover:shadow-2xl hover:border-rose-100 transition-all duration-700 relative"
+              >
+                <div className="relative aspect-[4/5] overflow-hidden">
+                  <img 
+                    src={salon.images?.[0] || assets.salon_placeholder} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                    alt={salon.name} 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-40" />
+                  <div className="absolute top-8 right-8 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black text-rose-600 shadow-2xl border border-rose-50">
+                    <Star size={12} className="fill-rose-600" />
+                    <span>{salon.rating || "4.9"}</span>
+                  </div>
+                  {dist !== null && (
+                    <div className="absolute top-8 left-8 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black text-rose-950 shadow-2xl border border-rose-50">
+                      <MapPin size={12} className="text-rose-600" />
+                      <span>{dist.toFixed(1)} km away</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-10">
+                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.3em] mb-3">{salon.categories?.[0] || 'Premium Workspace'}</p>
+                  <h3 className="font-black text-rose-950 text-2xl mb-2 group-hover:text-rose-600 transition-colors uppercase tracking-tight leading-none">{salon.name}</h3>
+                  <p className="text-[10px] text-rose-950/40 font-bold uppercase tracking-widest">{salon.location}</p>
                 </div>
               </div>
-              <div className="p-10">
-                <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.3em] mb-3">{salon.categories?.[0] || 'Premium Workspace'}</p>
-                <h3 className="font-black text-rose-950 text-2xl mb-2 group-hover:text-rose-600 transition-colors uppercase tracking-tight leading-none">{salon.name}</h3>
-                <p className="text-[10px] text-rose-950/40 font-bold uppercase tracking-widest">{salon.location}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
