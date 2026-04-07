@@ -12,8 +12,8 @@ const Navbar = ({ setToken }) => {
             alt="Logo"
             className="w-[max(10%,80px)] h-auto object-contain"
           />
-          <h1 className="hidden sm:block text-lg font-semibold text-gray-700 tracking-wide">
-            Admin Panel
+          <h1 className="hidden sm:block text-lg font-black text-gray-900 tracking-tight">
+            Book.My.<span className="text-pink-600">Glow</span> Admin
           </h1>
         </div>
 

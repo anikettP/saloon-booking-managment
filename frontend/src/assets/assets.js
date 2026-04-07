@@ -19,7 +19,7 @@ import WA_QR from './WA_QR.png'
 import Insta_QR from './Insta_QR.png'
 import share_icon from './share_icon.png'
 import empty_cart_icon from './empty_cart_icon.png' // ✅ Reverted to PNG
-import founder_img from './founder.webp'
+import founder_img from './founder_img.webp'
 import viewmore from './viewmore.png'
 import customicon from './customicon.png'
 
@@ -48,5 +48,6 @@ export const assets = {
   founder_img,
   empty_cart_icon,
   viewmore,
-  customicon
+  customicon,
+  salon_placeholder: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=800'
 }

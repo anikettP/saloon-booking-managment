@@ -1,19 +1,74 @@
-// backend/models/userModel.js
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    cartData: { type: Object, default: {} },
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
   },
-  {
-    minimize: false,
-    timestamps: true, // adds createdAt, updatedAt
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ["customer", "salonOwner", "admin", "superAdmin", "contentAdmin", "artist"],
+    default: "customer"
+  },
+  phone: {
+    type: String,
+    default: ""
+  },
+  location: {
+    type: String,
+    default: ""
+  },
+  avatar: {
+    type: String,
+    default: ""
+  },
+  // For artists: which salon they belong to
+  salon: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Salon",
+    default: null
+  },
+  specialization: {
+    type: String,
+    default: "Beauty Expert"
+  },
+  portfolio: {
+    type: [String],
+    default: []
+  },
+  totalWorkDone: {
+    type: Number,
+    default: 0
+  },
+  loyaltyPoints: {
+    type: Number,
+    default: 0
+  },
+  totalPointsEarned: {
+    type: Number,
+    default: 0
+  },
+  loyaltyTier: {
+    type: String,
+    enum: ["Bronze", "Silver", "Gold"],
+    default: "Bronze"
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
-);
+}, { timestamps: true });
 
-const userModel = mongoose.models.user || mongoose.model("user", userSchema);
-
-export default userModel;
+export default mongoose.model("User", userSchema);

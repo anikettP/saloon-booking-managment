@@ -1,58 +1,60 @@
-// backend/middleware/authUser.js
 import jwt from "jsonwebtoken";
+import User from "../models/userModel.js";
 
-const authUser = async (req, res, next) => {
-  // Accept token from:  token: <token>  OR  Authorization: Bearer <token>
-  const token =
-    req.headers.token ||
-    (req.headers.authorization &&
-      req.headers.authorization.split(" ")[1]);
+// Protect: verifies JWT and attaches req.user
+export const protect = async (req, res, next) => {
+  let token;
+
+  // Support both "Bearer <token>" header and legacy plain "token" header
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    token = req.headers.authorization.split(" ")[1];
+  } else if (req.headers.token) {
+    token = req.headers.token;
+  }
 
   if (!token) {
-    return res.json({
-      success: false,
-      message: "Not Authorized Login Again",
-    });
+    console.warn("Auth Middleware: Token missing in request headers.");
+    return res.status(401).json({ success: false, msg: "Not authorized. Token missing." });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "SECRET");
+    req.user = await User.findById(decoded.id).select("-password");
 
-    // user id may be stored under different keys in your token
-    const userId =
-      decoded.id ||
-      decoded._id ||
-      decoded.userId ||
-      decoded.user ||
-      null;
-
-    if (!userId) {
-      return res.json({
-        success: false,
-        message: "Invalid token: user id missing",
-      });
+    if (!req.user) {
+      console.warn(`Auth Middleware: User not found in DB for ID: ${decoded.id}`);
+      return res.status(401).json({ success: false, msg: "User not found" });
     }
-
-    // old controllers still use req.body.userId
-    req.body.userId = userId;
-
-    // new style – everything else should read from req.user._id
-    req.user = {
-      _id: userId,
-      ...(decoded.name ? { name: decoded.name } : {}),
-      ...(decoded.fullName ? { fullName: decoded.fullName } : {}),
-      ...(decoded.email ? { email: decoded.email } : {}),
-      ...(decoded.isAdmin ? { isAdmin: decoded.isAdmin } : {}),
-    };
 
     next();
   } catch (error) {
-    console.log("Auth Middleware Error:", error);
-    return res.json({
-      success: false,
-      message: "Invalid or Expired Token",
-    });
+    console.error("Auth Middleware: JWT Verification failed:", error.message);
+    return res.status(401).json({ success: false, msg: "Invalid or expired token" });
   }
 };
 
-export default authUser;
+// Optional protect: doesn't fail if no token, just attaches null
+export const optionalProtect = async (req, res, next) => {
+  let token;
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    token = req.headers.authorization.split(" ")[1];
+  } else if (req.headers.token) {
+    token = req.headers.token;
+  }
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "SECRET");
+    req.user = await User.findById(decoded.id).select("-password");
+  } catch {
+    req.user = null;
+  }
+  next();
+};
+
+// Legacy default export for backward compatibility
+export default protect;

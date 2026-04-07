@@ -1,26 +1,17 @@
 // backend/routes/paymentRoute.js
 import express from "express";
-import authUser from "../middleware/auth.js";
-import {
-  createRazorOrder,
-  verifyRazorPaymentAndPlaceOrder,
-  createUpiPaymentLink,
-  razorpayWebhook
-} from "../controllers/paymentController.js";
+import { protect } from "../middleware/auth.js";
+import { authorizeRoles } from "../middleware/role.js";
+import { initiateSalonRegistration, verifySalonRegistration, verifyBookingPayment, updateBookingPaymentStatus } from "../controllers/paymentController.js";
 
 const router = express.Router();
 
-// Razorpay order create (called by frontend to get order_id)
-router.post("/create-order", authUser, createRazorOrder);
+// Only Salon Owners can register a new salon and pay the fee
+router.post("/salon-initiate", protect, authorizeRoles("salonOwner"), initiateSalonRegistration);
+router.post("/salon-verify", protect, authorizeRoles("salonOwner"), verifySalonRegistration);
+router.post("/booking-verify", protect, verifyBookingPayment);
 
-// After checkout success, verify signature and place order
-router.post("/verify-order", authUser, verifyRazorPaymentAndPlaceOrder);
-
-// UPI / payment link flow (already used by your frontend)
-router.post("/create-upi-link", authUser, createUpiPaymentLink);
-
-// Webhook - note: server.js mounts the raw parser version for webhook.
-// Keep this here as additional safety if someone calls /api/payment/razorpay-webhook with raw body.
-router.post("/razorpay-webhook", express.raw({ type: "application/json" }), razorpayWebhook);
+// Owners/Admins manually confirm cash/at-salon payments
+router.put("/manual-confirm/:bookingId", protect, authorizeRoles("admin", "salonOwner"), updateBookingPaymentStatus);
 
 export default router;

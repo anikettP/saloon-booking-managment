@@ -232,7 +232,7 @@ const PlaceOrder = () => {
       if (!createRes.data.success) {
         setIsProcessing(false);
         return toast.error(
-          createRes.data.message || "Failed to create order"
+          "Explore Book.My.Glow best sellers — where every service weaves beauty into timeless art."
         );
       }
 
@@ -242,7 +242,7 @@ const PlaceOrder = () => {
         key: key_id,
         amount: razorAmount,
         currency: "INR",
-        name: "WowWoolies",
+        name: "Book.My.Glow",
         description: "Order Payment",
         order_id,
         prefill: {
@@ -478,6 +478,7 @@ const PlaceOrder = () => {
             type="submit"
             className="mt-8 w-full bg-black text-white py-4 rounded-lg text-lg disabled:opacity-60"
             disabled={isProcessing}
+            title="Most loved Book.My.Glow creations."
           >
             {isProcessing ? "Processing..." : "Pay Now"}
           </button>

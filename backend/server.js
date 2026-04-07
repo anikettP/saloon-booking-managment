@@ -1,11 +1,4 @@
-// server.js (FINAL PRODUCTION BUILD FOR SINGLE DOMAIN)
-// - Serves APIs
-// - Serves frontend (../frontend/dist) at '/'
-// - Serves admin panel (../admin/dist) at '/admin'
-// - Razorpay webhook raw body
-// - Proper CORS for 1 domain
-// - No localhost fallback
-// - Fully deploy-ready
+// server.js (SALON BOOKING SYSTEM)
 
 import "dotenv/config";
 import express from "express";
@@ -23,20 +16,44 @@ import morgan from "morgan";
 // Local Modules
 import connectDB from "./config/mongodb.js";
 import connectCloudinary from "./config/cloudinary.js";
+import User from "./models/userModel.js";
+import bcrypt from "bcrypt";
+
+const seedAdmin = async () => {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) return;
+
+    const adminExists = await User.findOne({ email: adminEmail.toLowerCase() });
+    if (!adminExists) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || "admin123", salt);
+      await User.create({
+        name: "System Admin",
+        email: adminEmail.toLowerCase(),
+        password: hashedPassword,
+        role: "admin"
+      });
+      console.log("✅ Admin user seeded successfully");
+    }
+  } catch (error) {
+    console.error("❌ Admin seeding failed:", error);
+  }
+};
 
 // Routes
 import userRouter from "./routes/userRoute.js";
-import productRouter from "./routes/productRoute.js";
-import cartRouter from "./routes/cartRoute.js";
-import orderRouter from "./routes/orderRoute.js";
-import reviewRoute from "./routes/reviewRoute.js";
-import paymentRouter from "./routes/paymentRoute.js";
-import bannerRouter from "./routes/bannerRoute.js";
-import banner2Router from "./routes/banner2Route.js";
-import categoryRouter from "./routes/categoryRoute.js";
-import manualReviewRouter from "./routes/manualReviewRoute.js";
+import authRoutes from "./routes/authRoutes.js";
+import salonRoutes from "./routes/salonRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
+import bannerRoutes from "./routes/bannerRoutes.js";
 import dashboardRouter from "./routes/dashboardRoute.js";
-import { razorpayWebhook } from "./controllers/paymentController.js";
+import paymentRouter from "./routes/paymentRoute.js";
+import reviewRouter from "./routes/reviewRoute.js";
+import analyticsRoutes from "./routes/analyticsRoute.js";
+import galleryRouter from "./routes/galleryRoute.js";
 
 /* -------------------- Setup ---------------------- */
 const __filename = fileURLToPath(import.meta.url);
@@ -45,21 +62,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// IMPORTANT: Single domain only
-const FRONTEND_URL = "https://wowwoolies.co.in";
-const ADMIN_URL = "https://wowwoolies.co.in/admin";
-
-// Allowed origins
-const allowedOrigins = [FRONTEND_URL, "https://www.wowwoolies.co.in"];
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",  // Frontend dev
+  "http://localhost:5174",  // Admin dev
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_URL,
+].filter(Boolean);
 
 /* ----------------- Security Middlewares ---------------- */
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(compression());
-app.use(morgan("combined"));
+app.use(morgan("dev"));
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 200,
+  max: 300,
 });
 app.use(limiter);
 
@@ -68,116 +88,136 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use("/uploads", express.static(uploadsDir));
 
-/* ------- Razorpay Webhook (RAW BODY) ---------- */
-app.post(
-  "/api/payment/razorpay-webhook",
-  express.raw({ type: "application/json" }),
-  (req, res) => {
-    try {
-      req.rawBody = req.body;
-      return razorpayWebhook(req, res);
-    } catch (err) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
-  }
-);
-
 /* ---------- Body Parser + CORS ----------------- */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Be permissive in dev; tighten in production
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "token"]
   })
 );
 
 /* ---------------- API Routes -------------------- */
+
+// Legacy: frontend still calls /api/user/*
 app.use("/api/user", userRouter);
-app.use("/api/product", productRouter);
-app.use("/api/cart", cartRouter);
-app.use("/api/order", orderRouter);
+
+// New unified auth: /api/auth/*
+app.use("/api/auth", authRoutes);
+
+// Salons
+app.use("/api/salons", salonRoutes);
+
+// Bookings
+app.use("/api/bookings", bookingRoutes);
+
+// Services
+app.use("/api/services", serviceRoutes);
+
+// Banners (CMS)
+app.use("/api/banners", bannerRoutes);
+
+// Admin
+app.use("/api/admin", adminRoutes);
+
+// Payments (Razorpay Salon Registration)
 app.use("/api/payment", paymentRouter);
-app.use("/api/review", reviewRoute);
-app.use("/api/banner", bannerRouter);
-app.use("/api/banner2", banner2Router);
-app.use("/api/category", categoryRouter);
-app.use("/api/testimonial", manualReviewRouter);
+
+// Reviews (Customer Rating & Owner Reply)
+app.use("/api/reviews", reviewRouter);
+
+// Business Insights for Owners
+app.use("/api/analytics", analyticsRoutes);
+
+// Community Gallery (Phase 7)
+app.use("/api/gallery", galleryRouter);
+
+// Dashboard (legacy admin dashboard)
 app.use("/api/dashboard", dashboardRouter);
 
 /* ---------------- Health Route ------------------ */
 app.get("/health", (req, res) =>
-  res.json({ ok: true, uptime: process.uptime() })
+  res.json({ ok: true, uptime: process.uptime(), service: "Salon Booking System" })
 );
 
-/* ---------------- Serve Frontend & Admin ------------------ */
+/* ---------------- Serve Frontend (Production) ------------------ */
 const frontendDistPath = path.join(__dirname, "../frontend/dist");
-const adminDistPath = path.join(__dirname, "../admin/dist");
 
-app.use(express.static(frontendDistPath)); // main site
-app.use("/admin", express.static(adminDistPath)); // admin panel
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
 
-/* ---------------- SPA Fallbacks ------------------ */
-app.get("*", (req, res) => {
-  // Skip API & uploads
-  if (req.path.startsWith("/api") || req.path.startsWith("/uploads"))
-    return res.status(404).json({ error: "Not Found" });
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads"))
+      return res.status(404).json({ error: "Not Found" });
 
-  // Admin fallback
-  if (req.path.startsWith("/admin")) {
-    const adminIndex = path.join(adminDistPath, "index.html");
-    return fs.existsSync(adminIndex)
-      ? res.sendFile(adminIndex)
-      : res.status(404).send("Admin build missing");
-  }
+    const indexPath = path.join(frontendDistPath, "index.html");
+    return fs.existsSync(indexPath)
+      ? res.sendFile(indexPath)
+      : res.status(404).send("Frontend build missing");
+  });
+}
 
-  // Frontend fallback
-  const frontendIndex = path.join(frontendDistPath, "index.html");
-  return fs.existsSync(frontendIndex)
-    ? res.sendFile(frontendIndex)
-    : res.status(404).send("Frontend build missing");
-});
-
-/* ---------------- Start After DB ------------------ */
+/* ---------------- Start Server ------------------ */
 let server = null;
 let io = null;
 
 const start = async () => {
   try {
     await connectDB();
-    console.log("MongoDB Connected");
+    console.log("✅ MongoDB Connected");
 
-    connectCloudinary();
+    await connectCloudinary();
+    console.log("✅ Cloudinary Connected");
+
+    await seedAdmin();
 
     server = http.createServer(app);
 
-    // Socket.io
     io = new IOServer(server, {
       cors: {
-        origin: allowedOrigins,
+        origin: ALLOWED_ORIGINS,
+        methods: ["GET", "POST"]
       },
     });
 
     app.set("io", io);
 
     io.on("connection", (socket) => {
-      console.log("Socket connected:", socket.id);
-      socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
+      console.log("🔌 Socket connected:", socket.id);
+
+      // Allow salon owners/admins to join rooms for live booking notifications
+      socket.on("join-salon", (salonId) => {
+        socket.join(`salon-${salonId}`);
+        console.log(`Socket ${socket.id} joined salon-${salonId}`);
+      });
+
+      socket.on("disconnect", () =>
+        console.log("❌ Socket disconnected:", socket.id)
+      );
     });
 
     server.listen(PORT, () =>
-      console.log(`🚀 Server running on port ${PORT}`)
+      console.log(`🚀 Salon Booking Server running on port ${PORT}`)
     );
   } catch (err) {
-    console.error("Failed Startup:", err);
+    console.error("❌ Failed Startup:", err);
     process.exit(1);
   }
 };
 
 start();
 
-/* ---------------- Graceful Shutdown ------------------- */
+/* ---------------- Shutdown ------------------- */
 process.on("SIGINT", () => process.exit(0));
 process.on("SIGTERM", () => process.exit(0));

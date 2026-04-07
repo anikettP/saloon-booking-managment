@@ -1,21 +1,28 @@
-// backend/routes/reviewRouter.js
 import express from "express";
-import authUser from "../middleware/auth.js";
+import { protect } from "../middleware/auth.js";
+import { authorizeRoles } from "../middleware/role.js";
 import {
-  addReview,
-  listReviews,
-  deleteReview,
+  createReview,
+  replyToReview,
+  getSalonReviews,
+  getDashboardReviews
 } from "../controllers/reviewController.js";
 
-const reviewRouter = express.Router();
+const router = express.Router();
 
-// PUBLIC – get reviews for a product
-reviewRouter.get("/list", listReviews);
+// ─── PUBLIC ───────────────────────────────────────────────────────────────────
+// Get all public reviews for a salon
+router.get("/salon/:salonId", getSalonReviews);
 
-// LOGGED-IN – add/update a review
-reviewRouter.post("/add", authUser, addReview);
+// ─── CUSTOMER ─────────────────────────────────────────────────────────────────
+// Leave a review
+router.post("/", protect, createReview);
 
-// LOGGED-IN – delete own review (or admin)
-reviewRouter.delete("/:id", authUser, deleteReview);
+// ─── SALON OWNER ──────────────────────────────────────────────────────────────
+// Relpy to a review
+router.put("/:id/reply", protect, authorizeRoles("salonOwner", "admin"), replyToReview);
 
-export default reviewRouter;
+// Get reviews for owner dashboard
+router.get("/dashboard", protect, authorizeRoles("salonOwner", "admin"), getDashboardReviews);
+
+export default router;

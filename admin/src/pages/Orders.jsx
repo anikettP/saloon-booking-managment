@@ -8,10 +8,10 @@ import { assets } from "../assets/assets";
 // GST / business details
 const GST_DETAILS = {
   registrationNumber: "08BAPPP9482F1ZY",
-  legalName: "MAHAVEER PRASAD SHARMA",
-  tradeName: "WOW WOOLIES",
-  principalPlace: "PLOT NO. 41, GANESH NAGAR, KALWAR ROAD, HARNATHPURA, JAIPUR, RAJASTHAN - 302012",
-  email: "wowwoolies25@gmail.com",
+  legalName: "BOOK.MY.GLOW",
+  tradeName: "BOOK.MY.GLOW",
+  principalPlace: "India",
+  email: "support@bookmyglow.com",
   phone: "+91-9352424085",
 };
 

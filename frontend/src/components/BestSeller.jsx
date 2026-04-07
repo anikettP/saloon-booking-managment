@@ -71,7 +71,7 @@ const BestSeller = () => {
       <div className="text-center py-4">
         <Title text1={"BEST"} text2={"SELLERS"} />
         <p className="w-3/4 m-auto text-xs sm:text-sm md:text-base text-gray-600 font-medium">
-          Explore WowWoolies best sellers — where every thread weaves creativity into timeless art.
+          Explore Book.My.Glow best sellers — where every service weaves beauty into timeless art.
         </p>
       </div>
 

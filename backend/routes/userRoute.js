@@ -1,30 +1,21 @@
 // backend/routes/userRoute.js
+// Kept for backward compatibility with frontend user auth calls
 import express from "express";
-import {
-  loginUser,
-  registerUser,
-  adminLogin,
-  getMe,
-} from "../controllers/userController.js";
-import { sendCheckoutOtp, verifyCheckoutOtp } from "../controllers/checkoutOtpController.js";
+import { login, register, adminLogin, getMe, updateProfile, updateArtistProfile } from "../controllers/authController.js";
 import { sendResetOtp, resetPassword } from "../controllers/passwordController.js";
-import authUser from "../middleware/auth.js";
+import { protect } from "../middleware/auth.js";
 
 const userRouter = express.Router();
 
 // USER AUTH
-userRouter.post("/register", registerUser);
-userRouter.post("/login", loginUser);
-
-// CURRENT USER PROFILE
-userRouter.get("/me", authUser, getMe);
-
-// ADMIN LOGIN
+userRouter.post("/register", register);
+userRouter.post("/login", login);
 userRouter.post("/admin", adminLogin);
 
-// GUEST CHECKOUT OTP
-userRouter.post("/checkout/send-otp", sendCheckoutOtp);
-userRouter.post("/checkout/verify-otp", verifyCheckoutOtp);
+// CURRENT USER PROFILE
+userRouter.get("/me", protect, getMe);
+userRouter.put("/profile", protect, updateProfile);
+userRouter.put("/artist/profile", protect, updateArtistProfile);
 
 // PASSWORD RESET
 userRouter.post("/reset/send-otp", sendResetOtp);

@@ -1,197 +1,136 @@
-// backend/controllers/reviewController.js
-import reviewModel from "../models/reviewModel.js";
-import userModel from "../models/userModel.js";
+import Review from "../models/reviewModel.js";
+import Booking from "../models/bookingModel.js";
+import Salon from "../models/salonModel.js";
 
-/**
- * POST /api/review/add
- * Create / update a review for the current user on a product
- */
-export const addReview = async (req, res) => {
-  try {
-    const userId = req.user?._id;
-    const { productId, rating, comment } = req.body;
+import mongoose from "mongoose";
 
-    if (!userId) {
-      return res.json({ success: false, message: "Not authorized" });
-    }
+// Helper: Recalculate average rating
+const updateSalonRating = async (salonId) => {
+  const stats = await Review.aggregate([
+    { $match: { salon: new mongoose.Types.ObjectId(salonId) } },
+    { $group: { _id: "$salon", avgRating: { $avg: "$rating" }, total: { $sum: 1 } } }
+  ]);
 
-    if (!productId || !rating) {
-      return res.json({
-        success: false,
-        message: "Product and rating are required",
-      });
-    }
-
-    const numericRating = Number(rating);
-    if (
-      Number.isNaN(numericRating) ||
-      numericRating < 1 ||
-      numericRating > 5
-    ) {
-      return res.json({
-        success: false,
-        message: "Rating must be between 1 and 5",
-      });
-    }
-
-    // fetch user to get display name + email
-    const user = await userModel
-      .findById(userId)
-      .select("name fullName email")
-      .lean();
-
-    const userName =
-      (user && (user.name || user.fullName)) ||
-      (user && user.email && user.email.split("@")[0]) ||
-      "User";
-
-    const userEmail = user?.email || "";
-
-    // If user already reviewed this product -> update instead of duplicate
-    let review = await reviewModel.findOne({ productId, userId });
-
-    if (review) {
-      review.rating = numericRating;
-      review.comment = comment || "";
-      review.userName = userName;
-      review.userEmail = userEmail;
-      await review.save();
-    } else {
-      review = await reviewModel.create({
-        productId,
-        userId,
-        rating: numericRating,
-        comment: comment || "",
-        userName,
-        userEmail,
-      });
-    }
-
-    // populate user for frontend (optional)
-    const populated = await review.populate("userId", "name fullName email");
-
-    const displayName =
-      (populated.userId &&
-        (populated.userId.name || populated.userId.fullName)) ||
-      populated.userName ||
-      (populated.userEmail
-        ? populated.userEmail.split("@")[0]
-        : "User");
-
-    // shape one clean object
-    const shaped = {
-      _id: populated._id,
-      productId: populated.productId,
-      rating: populated.rating,
-      comment: populated.comment || "",
-      createdAt: populated.createdAt,
-      updatedAt: populated.updatedAt,
-      name: displayName,
-      userId: populated.userId?._id || populated.userId,
-    };
-
-    return res.json({
-      success: true,
-      review: shaped,
-      message: "Review saved",
+  if (stats.length > 0) {
+    await Salon.findByIdAndUpdate(salonId, {
+      averageRating: Math.round(stats[0].avgRating * 10) / 10,
+      totalReviews: stats[0].total
     });
-  } catch (err) {
-    console.error("addReview error:", err);
-    return res.json({ success: false, message: err.message });
+  } else {
+    await Salon.findByIdAndUpdate(salonId, { averageRating: 0, totalReviews: 0 });
   }
 };
 
-/**
- * GET /api/review/list?productId=xxx&page=&limit=
- * Public endpoint – returns reviews for a product
- */
-export const listReviews = async (req, res) => {
+// ─── CUSTOMER CREATES REVIEW ────────────────────────────────────────────────
+export const createReview = async (req, res) => {
   try {
-    const { productId, page = 1, limit = 6 } = req.query;
+    const { bookingId, rating, comment } = req.body;
 
-    if (!productId) {
-      return res.json({
-        success: false,
-        message: "productId is required",
-      });
+    if (!rating || rating < 1 || rating > 5)
+      return res.status(400).json({ success: false, message: "Valid rating (1-5) is required." });
+    
+    if (!comment || comment.trim() === "")
+      return res.status(400).json({ success: false, message: "Comment is required." });
+
+    // Verify the booking
+    const booking = await Booking.findById(bookingId);
+    if (!booking)
+      return res.status(404).json({ success: false, message: "Booking not found." });
+
+    if (String(booking.user) !== String(req.user._id))
+      return res.status(403).json({ success: false, message: "Unauthorized. This is not your booking." });
+
+    if (booking.status !== "completed")
+      return res.status(400).json({ success: false, message: "You can only review a completed service." });
+
+    if (booking.isReviewed)
+      return res.status(400).json({ success: false, message: "You have already reviewed this booking." });
+
+    // Create the review
+    const review = await Review.create({
+      user: req.user._id,
+      salon: booking.salon,
+      artist: booking.artist || null,
+      booking: booking._id,
+      rating: Number(rating),
+      comment: comment.trim()
+    });
+
+    // Mark booking as reviewed
+    booking.isReviewed = true;
+    await booking.save();
+
+    // Recalculate Salon Rating
+    await updateSalonRating(booking.salon);
+
+    res.status(201).json({ success: true, review, message: "Review posted successfully!" });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: "Review already exists for this booking." });
     }
-
-    const pageNum = Number(page) || 1;
-    const perPage = Number(limit) || 6;
-
-    const query = { productId };
-
-    const [reviews, total] = await Promise.all([
-      reviewModel
-        .find(query)
-        .sort({ createdAt: -1 })
-        .skip((pageNum - 1) * perPage)
-        .limit(perPage)
-        .populate("userId", "name fullName email")
-        .lean(),
-      reviewModel.countDocuments(query),
-    ]);
-
-    const shaped = reviews.map((r) => {
-      const userDoc = r.userId; // after populate this is the user document
-      const userName =
-        (userDoc && (userDoc.name || userDoc.fullName)) ||
-        r.userName ||
-        (r.userEmail ? r.userEmail.split("@")[0] : "") ||
-        "User";
-
-      const userId = userDoc?._id || r.userId || null;
-
-      return {
-        _id: r._id,
-        productId: r.productId,
-        rating: r.rating,
-        comment: r.comment || "",
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-        name: userName,
-        userId,
-      };
-    });
-
-    return res.json({
-      success: true,
-      reviews: shaped,
-      total,
-      page: pageNum,
-    });
-  } catch (err) {
-    console.error("listReviews error:", err);
-    return res.json({ success: false, message: err.message });
+    console.error("createReview error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * DELETE /api/review/:id
- * Only review owner or admin can delete
- */
-export const deleteReview = async (req, res) => {
+// ─── SALON OWNER REPLIES ────────────────────────────────────────────────────
+export const replyToReview = async (req, res) => {
   try {
-    const userId = req.user?._id;
-    const isAdmin = !!req.user?.isAdmin;
     const { id } = req.params;
+    const { ownerReply } = req.body;
 
-    const review = await reviewModel.findById(id);
-    if (!review) {
-      return res.json({ success: false, message: "Review not found" });
-    }
+    if (!ownerReply || ownerReply.trim() === "")
+      return res.status(400).json({ success: false, message: "Reply cannot be empty." });
 
-    if (!isAdmin && String(review.userId) !== String(userId)) {
-      return res.json({
-        success: false,
-        message: "You cannot delete this review",
-      });
-    }
+    const review = await Review.findById(id).populate("salon");
+    if (!review)
+      return res.status(404).json({ success: false, message: "Review not found." });
 
-    await reviewModel.findByIdAndDelete(id);
-    return res.json({ success: true, message: "Review deleted" });
-  } catch (err) {
-    console.error("deleteReview error:", err);
-    return res.json({ success: false, message: err.message });
+    // Verify ownership
+    if (String(review.salon.owner) !== String(req.user._id) && req.user.role !== "admin")
+      return res.status(403).json({ success: false, message: "Only the Salon Owner can reply to this review." });
+
+    review.ownerReply = ownerReply.trim();
+    await review.save();
+
+    res.json({ success: true, review, message: "Reply posted successfully!" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── GET PUBLIC REVIEWS FOR SALON ───────────────────────────────────────────
+export const getSalonReviews = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+
+    const reviews = await Review.find({ salon: salonId })
+      .populate("user", "name avatar")
+      .populate("artist", "name avatar")
+      .sort({ createdAt: -1 })
+      .limit(50); // Hard limit for display
+
+    res.json({ success: true, reviews });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── GET DASHBOARD REVIEWS (Salon Owner) ────────────────────────────────────
+export const getDashboardReviews = async (req, res) => {
+  try {
+    const salon = await Salon.findOne({ owner: req.user._id });
+    if (!salon)
+      return res.status(404).json({ success: false, message: "You don't have a salon yet." });
+
+    const reviews = await Review.find({ salon: salon._id })
+      .populate("user", "name email")
+      .populate("artist", "name")
+      .populate("booking", "serviceName date timeSlot")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, reviews });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

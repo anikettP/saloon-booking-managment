@@ -1,19 +1,38 @@
-// backend/models/bannerModel.js
-import mongoose from 'mongoose'
+import mongoose from "mongoose";
 
 const bannerSchema = new mongoose.Schema({
-  // new fields for desktop & mobile
-  image_desktop: { type: String, default: '' }, // public URL for desktop
-  image_mobile: { type: String, default: '' },  // public URL for mobile
-  // keep legacy image (optional)
-  image: { type: String, default: '' },
+  title: {
+    type: String,
+    default: ""
+  },
+  subtitle: {
+    type: String,
+    default: ""
+  },
+  imageUrl: { type: String }, // General/Fallback
+  imageDesktop: { type: String }, // Premium Desktop High-Res
+  imageMobile: { type: String },  // Optimized Mobile Portrait
+  linkUrl: {
+    type: String,
+    default: "/salons"
+  },
+  ctaText: {
+    type: String,
+    default: "Book Now"
+  },
+  type: {
+    type: String,
+    enum: ["hero", "promo", "poster", "marquee"],
+    default: "hero"
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  order: {
+    type: Number,
+    default: 0
+  }
+}, { timestamps: true });
 
-  title: { type: String, default: '' },
-  link: { type: String, default: '' },
-  order: { type: Number, default: 0 },
-  active: { type: Boolean, default: true },
-  date: { type: Number, required: true }
-})
-
-const bannerModel = mongoose.models.banner || mongoose.model('banner', bannerSchema)
-export default bannerModel
+export default mongoose.model("Banner", bannerSchema);

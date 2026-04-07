@@ -34,7 +34,7 @@ const BestSellerPage = () => {
           <Title text1="BEST" text2="SELLERS" />
         </div>
         <p className="w-4/5 sm:w-3/5 mx-auto text-sm md:text-base text-gray-600 mt-4">
-          Most loved WowWoolies creations.
+          Most loved Book.My.Glow creations.
         </p>
       </div>
 

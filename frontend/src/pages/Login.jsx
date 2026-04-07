@@ -1,61 +1,66 @@
+// frontend/src/pages/Login.jsx
 import React, { useContext, useEffect, useState } from "react";
-import { ShopContext } from "../context/ShopContext";
+import { SalonContext } from "../context/SalonContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-// 1. Import the hook
-import { usePopup } from "../context/PopupContext";
+import { Sparkles, ArrowRight, ShieldCheck, UserCheck, Scissors } from "lucide-react";
 
 const Login = () => {
   const [currentState, setCurrentState] = useState("Login");
-  const { token, setToken, backendUrl } = useContext(ShopContext);
+  const { token, setToken, setUser, backendUrl } = useContext(SalonContext);
   const navigate = useNavigate();
-  
-  // 2. Get the trigger function
-  const { triggerProfilePopup } = usePopup();
 
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("customer");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const authBase = `${backendUrl}/api/user`;
+  // Redirect if already logged in
+  useEffect(() => {
+    if (token) navigate("/dashboard");
+  }, [token, navigate]);
 
-  const onSubmitHandler = async (event) => {
-    event.preventDefault();
+  const onSubmitHandler = async (e) => {
+    e.preventDefault();
     setErrorMsg("");
     try {
       setLoading(true);
+      const authBase = `${backendUrl}/api/user`;
+
       if (currentState === "Sign Up") {
-        const response = await axios.post(`${authBase}/register`, { name, email, password });
-        if (response.data.success) {
-          setToken(response.data.token);
-          localStorage.setItem("token", response.data.token);
-          
-          // 3. Trigger the Pink Profile Popup (Animation + Redirect)
-          triggerProfilePopup();
-          
+        const res = await axios.post(`${authBase}/register`, { name, email, password, role });
+        if (res.data.success) {
+          setToken(res.data.token);
+          setUser(res.data.user);
+          localStorage.setItem("token", res.data.token);
+          toast.success("Welcome to Book.My.Glow! 🎉");
+          navigate("/dashboard");
         } else {
-          setErrorMsg(response.data.message);
-          toast.error(response.data.message);
+          setErrorMsg(res.data.message);
+          toast.error(res.data.message);
         }
       } else {
-        const response = await axios.post(`${authBase}/login`, { email, password });
-        if (response.data.success) {
-          setToken(response.data.token);
-          localStorage.setItem("token", response.data.token);
-          
-          // 3. Trigger the Pink Profile Popup (Animation + Redirect)
-          triggerProfilePopup();
+        const res = await axios.post(`${authBase}/login`, { email, password });
+        if (res.data.success) {
+          setToken(res.data.token);
+          setUser(res.data.user);
+          localStorage.setItem("token", res.data.token);
+          toast.success("Welcome back! 💫");
 
+          // Role-based redirect
+          const userRole = res.data.user?.role;
+          if (userRole === "artist") navigate("/artist-dashboard");
+          else navigate("/dashboard");
         } else {
-          setErrorMsg(response.data.message);
-          toast.error(response.data.message);
+          setErrorMsg(res.data.message);
+          toast.error(res.data.message);
         }
       }
-    } catch (error) {
-      const msg = error?.response?.data?.message || error.message;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message;
       setErrorMsg(msg);
       toast.error(msg);
     } finally {
@@ -64,65 +69,146 @@ const Login = () => {
   };
 
   return (
-    // Added 'relative z-10' to ensure inputs are clickable above background elements
-    <section className="flex flex-col items-center justify-center w-[90%] sm:max-w-md m-auto mt-32 pt-5 text-gray-800 relative z-10">
-      <div className="w-full bg-white/20 backdrop-blur-lg border border-white/30 rounded-2xl shadow-xl p-8 sm:p-10 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl">
-        <form onSubmit={onSubmitHandler} className="w-full">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <p className="prata-regular text-3xl">{currentState}</p>
-            <hr className="border-none h-[1.5px] w-8 bg-gray-800" />
-          </div>
+    <section className="flex flex-col items-center justify-center min-h-screen px-4 bg-[#FFFBFA] relative overflow-hidden selection:bg-rose-100">
+      {/* Ambient Background Elements */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-rose-500/5 blur-[150px] -mt-64 pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-rose-200/10 blur-[120px] -mr-64 -mb-64 pointer-events-none" />
 
+      <div className="w-full max-w-md bg-white border border-rose-50 rounded-[3.5rem] shadow-2xl shadow-rose-500/5 p-10 sm:p-14 relative group">
+        
+        {/* Header */}
+        <div className="text-center mb-12 relative z-10">
+          <div className="w-16 h-16 bg-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-8 text-white shadow-2xl shadow-rose-500/20 group-hover:rotate-12 transition-transform duration-700">
+             <ShieldCheck size={28} />
+          </div>
+          <h1 className="text-4xl font-black text-rose-950 uppercase tracking-tight mb-3">
+            {currentState === "Login" ? "Establish Session" : "Join the Elite"}
+          </h1>
+          <p className="text-rose-950/40 text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">
+            {currentState === "Login"
+              ? "Access your premium profile"
+              : "Register your corporate identity"}
+          </p>
+        </div>
+
+        <form onSubmit={onSubmitHandler} className="space-y-6 relative z-10">
           {currentState === "Sign Up" && (
-            <input 
-              onChange={(e) => setName(e.target.value)} 
-              value={name} 
-              type="text" 
-              name="name"              // Added name for browser autofill
-              autoComplete="name"      // Helps browser identify field
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 bg-white/40 focus:outline-none focus:ring-1 focus:ring-pink-400" 
-              placeholder="Name" 
-              required 
-            />
+            <div className="animate-in fade-in slide-in-from-top-4 duration-500 space-y-6">
+               <div>
+                <label className="block text-[9px] font-black text-rose-600/60 uppercase tracking-widest mb-3 ml-1 leading-none">Full Identity</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  autoComplete="name"
+                  required
+                  placeholder="Official Name"
+                  className="w-full bg-[#FFFBFA] border border-rose-100 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-rose-950 focus:outline-none focus:ring-1 focus:ring-rose-600 transition-all placeholder:text-rose-950/20 shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-black text-rose-600/60 uppercase tracking-widest mb-3 ml-1 leading-none">Access Level</label>
+                <div className="grid grid-cols-1 gap-2.5">
+                    {[
+                      { value: "customer", label: "Privileged Client", desc: "Access primary booking" },
+                      { value: "salonOwner", label: "Studio Proprietor", desc: "Manage workstation hub" },
+                    ].map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRole(option.value)}
+                      className={`p-5 rounded-2xl border transition-all text-left relative overflow-hidden group/btn ${
+                        role === option.value
+                          ? "bg-rose-600 text-white border-rose-600 shadow-xl shadow-rose-500/20"
+                          : "bg-[#FFFBFA] border-rose-100 hover:border-rose-300"
+                      }`}
+                    >
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${role === option.value ? 'text-white' : 'text-rose-950'}`}>{option.label}</p>
+                      <p className={`text-[8px] font-black uppercase tracking-tighter mt-1 ${role === option.value ? 'text-white/60' : 'text-rose-950/30'}`}>{option.desc}</p>
+                      {role === option.value && <UserCheck size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/40" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
-          <input 
-            onChange={(e) => setEmail(e.target.value)} 
-            value={email} 
-            type="email" 
-            name="email"               // Added name
-            autoComplete="email"       // Helps browser identify field
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 bg-white/40 focus:outline-none focus:ring-1 focus:ring-pink-400" 
-            placeholder="Email" 
-            required 
-          />
-          <input 
-            onChange={(e) => setPassword(e.target.value)} 
-            value={password} 
-            type="password" 
-            name="password"            // Added name
-            autoComplete="current-password" // Helps browser identify field
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 bg-white/40 focus:outline-none focus:ring-1 focus:ring-pink-400" 
-            placeholder="Password" 
-            required 
-          />
 
-          <div className="w-full flex justify-between text-sm mt-[-4px]">
-            <p onClick={() => navigate("/forgot")} className="cursor-pointer text-blue-600 hover:underline">Forgot Password?</p>
-            {currentState === "Login" ? (
-              <p onClick={() => { setCurrentState("Sign Up"); setErrorMsg(""); }} className="cursor-pointer text-blue-600 hover:underline">Create account</p>
+          <div className="animate-in fade-in duration-700">
+            <label className="block text-[9px] font-black text-rose-600/60 uppercase tracking-widest mb-3 ml-1 leading-none">Secure Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+              placeholder="ENTER EMAIL ADDRESS"
+              className="w-full bg-[#FFFBFA] border border-rose-100 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-rose-950 focus:outline-none focus:ring-1 focus:ring-rose-600 transition-all placeholder:text-rose-950/20 shadow-inner"
+            />
+          </div>
+
+          <div className="animate-in fade-in duration-700">
+            <label className="block text-[9px] font-black text-rose-600/60 uppercase tracking-widest mb-3 ml-1 leading-none">Secret Path</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete={currentState === "Login" ? "current-password" : "new-password"}
+              required
+              placeholder="••••••••••••"
+              className="w-full bg-[#FFFBFA] border border-rose-100 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-rose-950 focus:outline-none focus:ring-1 focus:ring-rose-600 transition-all placeholder:text-rose-950/20 shadow-inner"
+            />
+          </div>
+
+          {currentState === "Login" && (
+            <div className="text-right mt-2">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot")}
+                className="text-[9px] font-black text-rose-950/30 hover:text-rose-600 uppercase tracking-widest transition-colors leading-none"
+              >
+                Forgot Password?
+              </button>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="text-[9px] font-black text-red-600 bg-red-50 px-4 py-4 rounded-xl border border-red-100 uppercase tracking-widest text-center animate-shake leading-tight">
+               {errorMsg}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-rose-600 text-white font-black py-5 rounded-2xl hover:bg-rose-700 transition-all shadow-2xl shadow-rose-500/20 flex items-center justify-center gap-3 uppercase text-[10px] tracking-[0.3em] disabled:opacity-50 mt-4 active:scale-95"
+          >
+            {loading ? (
+              "SYNCHRONIZING..."
             ) : (
-              <p onClick={() => { setCurrentState("Login"); setErrorMsg(""); }} className="cursor-pointer text-blue-600 hover:underline">Login Here</p>
+              currentState === "Login" ? "Establish Identity" : "Launch Profile"
             )}
-          </div>
-
-          {errorMsg && <p className="mt-3 text-xs text-red-600 leading-snug">{errorMsg}</p>}
-
-          <div className="mt-6">
-            <button type="submit" disabled={loading} className="w-full bg-black text-white font-light px-8 py-3 rounded-lg transition-all duration-500 hover:bg-gray-800 disabled:opacity-60">
-              {loading ? "Please wait..." : currentState === "Login" ? "Sign In" : "Sign Up"}
-            </button>
-          </div>
+            <ArrowRight size={16} />
+          </button>
         </form>
+
+        <div className="text-center mt-12 relative z-10 border-t border-rose-50 pt-8">
+          {currentState === "Login" ? (
+            <p className="text-[9px] font-black text-rose-950/30 uppercase tracking-widest leading-none">
+              New Recuit?{" "}
+              <button onClick={() => { setCurrentState("Sign Up"); setErrorMsg(""); }} className="text-rose-600 hover:text-rose-950 transition-colors ml-2 font-black italic">
+                Register Here
+              </button>
+            </p>
+          ) : (
+            <p className="text-[9px] font-black text-rose-950/30 uppercase tracking-widest leading-none">
+              Existing Member?{" "}
+              <button onClick={() => { setCurrentState("Login"); setErrorMsg(""); }} className="text-rose-600 hover:text-rose-950 transition-colors ml-2 font-black italic">
+                Authorize Access
+              </button>
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );

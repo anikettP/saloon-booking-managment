@@ -49,7 +49,7 @@ export const sendMail = async ({
 
     const safeCode = code || '';
 
-    // Pretty OTP email template (WowWoolies themed)
+    // Pretty OTP email template (Book.My.Glow themed)
     finalHtml = `
       <div style="
         font-family: Arial, sans-serif;
@@ -72,7 +72,7 @@ export const sendMail = async ({
             letter-spacing:0.12em;
             text-transform:uppercase;
           ">
-            WowWoolies ✨
+            Book.My.Glow ✨
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export const sendMail = async ({
           color:#555;
           margin:0 0 18px;
         ">
-          Use this code to securely continue.  
+          Most loved Book.My.Glow creations.
           <span style="display:block; margin-top:4px;">Please don’t share it with anyone.</span>
         </p>
 
@@ -112,7 +112,7 @@ export const sendMail = async ({
             ${safeCode}
           </div>
           <div style="margin-top:8px; font-size:12px; color:#777;">
-            This code will be valid for approximately ${expiresInMinutes} minutes.
+            Explore Book.My.Glow best sellers — where every service weaves beauty into timeless art.
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export const sendMail = async ({
 
         <p style="font-size:12px; color:#999; margin-top:16px; text-align:center;">
           With love,<br/>
-          <strong>Team WowWoolies</strong>
+          <strong>Team Book.My.Glow</strong>
         </p>
       </div>
     `;
@@ -144,7 +144,7 @@ export const sendMail = async ({
 };
 
 /**
- * ORDER EMAIL — upgraded to a beautiful WowWoolies–styled template
+ * ORDER EMAIL — upgraded to a beautiful Book.My.Glow–styled template
  * Signature is SAME: ({ to, name, order })
  */
 export const sendOrderEmail = async ({ to, name, order }) => {
@@ -242,9 +242,9 @@ export const sendOrderEmail = async ({ to, name, order }) => {
       max-width: 640px;
       margin: 0 auto;
       padding: 24px 20px;
-      background: #fff5f7;
+      background: #fdf2f8;
       border-radius: 18px;
-      border: 1px solid #ffe4ea;
+      border: 1px solid #fbcfe8;
     ">
       <!-- Brand chip -->
       <div style="text-align:center; margin-bottom:18px;">
@@ -252,14 +252,14 @@ export const sendOrderEmail = async ({ to, name, order }) => {
           display:inline-block;
           padding:10px 18px;
           border-radius:999px;
-          background:linear-gradient(135deg,#fb7185,#ec4899);
+          background:linear-gradient(135deg,#db2777,#ec4899);
           color:#ffffff;
           font-weight:600;
           font-size:13px;
           letter-spacing:0.12em;
           text-transform:uppercase;
         ">
-          WowWoolies ✨
+          Book.My.Glow ✨
         </div>
       </div>
 
@@ -359,7 +359,7 @@ export const sendOrderEmail = async ({ to, name, order }) => {
 
       <p style="font-size:12px; color:#999; margin-top:14px;">
         With love,<br/>
-        <strong>Team WowWoolies</strong> 🎀
+        <strong>Team Book.My.Glow</strong> 💅
       </p>
     </div>
   `;

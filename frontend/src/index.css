@@ -14,21 +14,21 @@
    Theme variables (ALL PINK)
    -------------------------------- */
 :root {
-  /* Base */
-  --color-bg: #fcbebe;          /* light pink page */
-  --color-surface: #ffffff;     /* cards/surfaces */
-  --color-text: #9d174d;        /* deep pink text (rose-700) */
-  --color-muted: #be185d;       /* mid pink for secondary text */
+  /* Premium Obsidian & Gold Base */
+  --color-bg: #0A0A0A;          /* Deep Obsidian */
+  --color-surface: #111111;     /* Matte Black */
+  --color-text: #F5F5F5;        /* Off-White text */
+  --color-muted: #A1A1AA;       /* Zinc Muted */
 
-  /* Brand */
-  --color-primary: #ec4899;     /* pink-500 */
-  --color-accent:  #f472b6;     /* pink-400 (hover/soft) */
-  --color-secondary:#be185d;    /* pink-700 (strong/dark) */
+  /* Champagne Gold Accents */
+  --color-primary: #D4AF37;     /* Metallic Gold */
+  --color-accent:  #F5E8C7;     /* Soft Champagne */
+  --color-secondary: #996515;   /* Dark Bronze */
 
-  /* tokens */
+  /* Luxe tokens */
   --frame-gap: 6px;
-  --hero-radius: 1rem;
-  --hero-shadow: 0 12px 40px rgba(236, 72, 153, 0.18);
+  --hero-radius: 1.5rem;
+  --hero-shadow: 0 20px 60px rgba(212, 175, 55, 0.15);
 }
 
 /* Optional same-pink theme alias */
@@ -70,19 +70,9 @@ html, body {
   /* 1. Fallback color */
   background-color: var(--color-bg);
   
-  /* 2. Pink Overlay (92% Opacity) */
-  background-image: 
-    linear-gradient(
-      rgba(252, 190, 190, 0.80),  
-      rgba(252, 190, 190, 0.80)
-    ),
-    url('/wowwooliesbg.webp'); 
-
-  /* 3. Pattern Logic: Zoomed in by 20% */
-  background-repeat: repeat;      
-  
-  /* 500px + 20% = 600px */
-  background-size: 800px auto;    
+  /* 2. Premium Glow Background */
+  background: radial-gradient(circle at top left, #fff1f2 0%, #fff 100%);
+  background-attachment: fixed;
   
   background-position: center top;
   background-attachment: fixed;   

@@ -1,124 +1,142 @@
-// backend/controllers/bannerController.js
-import Banner from '../models/bannerModel.js'
-import cloudinary from 'cloudinary'
-import fs from 'fs'
+import Banner from "../models/bannerModel.js";
+import { v2 as cloudinary } from "cloudinary";
+import streamifier from "streamifier";
 
-// ✅ UPDATED: Max limit set to 6
-const MAX_BANNERS = 6
+const uploadToCld = (buffer, folder = "banners") =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: "image" },
+      (err, result) => { if (err) reject(err); else resolve(result.secure_url); }
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
 
-// Helper to upload one file if present
-async function uploadFile(filePath) {
-  if (!filePath) return ''
-  const uploaded = await cloudinary.v2.uploader.upload(filePath, { folder: 'banners' })
-  try { fs.unlinkSync(filePath) } catch (e) {}
-  return uploaded.secure_url
-}
-
-// Add new banner
-export const addBanner = async (req, res) => {
+// ─── GET ALL BANNERS (Public - active only) ───────────────────────────────────
+export const getBanners = async (req, res) => {
   try {
-    const total = await Banner.countDocuments()
-    if (total >= MAX_BANNERS) {
-      return res.json({ success: false, message: `Maximum ${MAX_BANNERS} banners allowed` })
+    const { type, all } = req.query;
+    // 'all' means admin list. if all is false/missing, only show active.
+    const query = all === "true" ? {} : { isActive: true };
+    if (type) query.type = type;
+
+    const banners = await Banner.find(query).sort({ order: 1, createdAt: -1 });
+    res.json({ success: true, banners });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── CREATE BANNER ────────────────────────────────────────────────────────────
+export const createBanner = async (req, res) => {
+  try {
+    // legacy check: link maps to linkUrl
+    let { title, subtitle, linkUrl, link, ctaText, type, order } = req.body;
+    const finalLink = linkUrl || link || "/salons";
+
+    const bannerData = {
+      title: title || "",
+      subtitle: subtitle || "",
+      linkUrl: finalLink,
+      ctaText: ctaText || "Book Now",
+      type: type || "hero",
+      order: order ? Number(order) : 0
+    };
+
+    // Handle generic upload (req.file)
+    if (req.file) {
+      bannerData.imageUrl = await uploadToCld(req.file.buffer);
     }
 
-    let imageDesktop = req.body.image_desktop || ''
-    let imageMobile = req.body.image_mobile || ''
-    let imageLegacy = req.body.image || ''
-
-    // Handle files
+    // Handle multi-upload fields (req.files)
     if (req.files) {
-      if (req.files['image_desktop'] && req.files['image_desktop'][0]) {
-        imageDesktop = await uploadFile(req.files['image_desktop'][0].path)
+      if (req.files.image?.[0]) {
+        bannerData.imageUrl = await uploadToCld(req.files.image[0].buffer);
       }
-      if (req.files['image_mobile'] && req.files['image_mobile'][0]) {
-        imageMobile = await uploadFile(req.files['image_mobile'][0].path)
+      if (req.files.image_desktop?.[0]) {
+        bannerData.imageDesktop = await uploadToCld(req.files.image_desktop[0].buffer);
+        // also set fallback if not set
+        if(!bannerData.imageUrl) bannerData.imageUrl = bannerData.imageDesktop;
       }
-      if (req.files['image'] && req.files['image'][0]) {
-        imageLegacy = await uploadFile(req.files['image'][0].path)
+      if (req.files.image_mobile?.[0]) {
+        bannerData.imageMobile = await uploadToCld(req.files.image_mobile[0].buffer);
       }
     }
 
-    // Requirement: Must have at least one image source
-    if (!imageDesktop && !imageMobile && !imageLegacy) {
-      return res.json({ success: false, message: 'No banner image provided' })
-    }
-
-    const count = await Banner.countDocuments()
-    
-    const banner = new Banner({
-      image_desktop: imageDesktop,
-      image_mobile: imageMobile,
-      image: imageLegacy,
-      title: req.body.title || '',
-      link: req.body.link || '', 
-      order: parseInt(req.body.order || count),
-      active: req.body.active !== undefined ? (req.body.active === 'true' || req.body.active === true) : true,
-      date: Date.now()
-    })
-
-    await banner.save()
-    return res.json({ success: true, message: 'Banner added', banner })
-
-  } catch (err) {
-    console.error('addBanner error', err)
-    return res.json({ success: false, message: err.message || 'Server error' })
+    const banner = await Banner.create(bannerData);
+    res.status(201).json({ success: true, banner, message: "Banner created successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
-}
+};
 
-// List banners
-export const listBanners = async (req, res) => {
-  try {
-    const banners = await Banner.find({}).sort({ order: 1, date: -1 })
-    return res.json({ success: true, banners })
-  } catch (err) {
-    console.error('listBanners error', err)
-    return res.json({ success: false, message: err.message || 'Server error' })
-  }
-}
-
-// Remove banner
-export const removeBanner = async (req, res) => {
-  try {
-    const { id } = req.body
-    if (!id) return res.json({ success: false, message: 'Banner id required' })
-    
-    await Banner.findByIdAndDelete(id)
-    return res.json({ success: true, message: 'Banner removed' })
-  } catch (err) {
-    console.error('removeBanner error', err)
-    return res.json({ success: false, message: err.message || 'Server error' })
-  }
-}
-
-// Update banner
+// ─── UPDATE BANNER ────────────────────────────────────────────────────────────
 export const updateBanner = async (req, res) => {
   try {
-    const { id, title, link, order, active } = req.body
-    if (!id) return res.json({ success: false, message: 'Banner id required' })
+    // Support both URL param and legacy body ID
+    const id = req.params.id || req.body.id;
+    if (!id) return res.status(400).json({ success: false, message: "ID is required" });
 
-    const update = {}
-    if (title !== undefined) update.title = title
-    if (link !== undefined) update.link = link
-    if (order !== undefined) update.order = parseInt(order)
-    if (active !== undefined) update.active = (active === 'true' || active === true)
+    const updates = { ...req.body };
+    
+    // Legacy mapping
+    if (updates.link) updates.linkUrl = updates.link;
+    if (updates.active !== undefined) updates.isActive = updates.active;
+
+    // Handle file uploads
+    if (req.file) {
+      updates.imageUrl = await uploadToCld(req.file.buffer);
+    }
 
     if (req.files) {
-      if (req.files['image_desktop'] && req.files['image_desktop'][0]) {
-        update.image_desktop = await uploadFile(req.files['image_desktop'][0].path)
+      if (req.files.image?.[0]) {
+        updates.imageUrl = await uploadToCld(req.files.image[0].buffer);
       }
-      if (req.files['image_mobile'] && req.files['image_mobile'][0]) {
-        update.image_mobile = await uploadFile(req.files['image_mobile'][0].path)
+      if (req.files.image_desktop?.[0]) {
+        updates.imageDesktop = await uploadToCld(req.files.image_desktop[0].buffer);
       }
-      if (req.files['image'] && req.files['image'][0]) {
-        update.image = await uploadFile(req.files['image'][0].path)
+      if (req.files.image_mobile?.[0]) {
+        updates.imageMobile = await uploadToCld(req.files.image_mobile[0].buffer);
       }
     }
 
-    await Banner.findByIdAndUpdate(id, update)
-    return res.json({ success: true, message: 'Banner updated' })
-  } catch (err) {
-    console.error('updateBanner error', err)
-    return res.json({ success: false, message: err.message || 'Server error' })
+    const banner = await Banner.findByIdAndUpdate(id, updates, { new: true });
+    if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
+
+    res.json({ success: true, banner, message: "Banner updated successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
-}
+};
+
+// ─── DELETE BANNER ────────────────────────────────────────────────────────────
+export const deleteBanner = async (req, res) => {
+  try {
+    const id = req.params.id || req.body.id;
+    if (!id) return res.status(400).json({ success: false, message: "ID is required" });
+
+    const deleted = await Banner.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ success: false, message: "Banner not found" });
+
+    res.json({ success: true, message: "Banner deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── TOGGLE BANNER ACTIVE ─────────────────────────────────────────────────────
+export const toggleBanner = async (req, res) => {
+  try {
+    const id = req.params.id || req.body.id;
+    if (!id) return res.status(400).json({ success: false, message: "ID is required" });
+
+    const banner = await Banner.findById(id);
+    if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
+
+    banner.isActive = !banner.isActive;
+    await banner.save();
+
+    res.json({ success: true, banner, message: `Banner ${banner.isActive ? "activated" : "deactivated"}` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

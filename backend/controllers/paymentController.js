@@ -1,273 +1,214 @@
 // backend/controllers/paymentController.js
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import orderModel from "../models/orderModel.js";
-// ✅ REMOVED: import customRequestModel ...
-import { notifyOrderPaid } from "../utils/notify.js";
-import dotenv from "dotenv";
-dotenv.config();
+import Salon from "../models/salonModel.js";
+import { sendBookingConfirmation } from "../services/emailService.js";
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || "";
-
+// Razorpay Instance
 const razorpay = new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET,
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-/**
- * createRazorOrder
- */
-export const createRazorOrder = async (req, res) => {
-  try {
-    const { amount } = req.body;
-    if (!amount)
-      return res
-        .status(400)
-        .json({ success: false, message: "Amount required" });
+// Fixed fee for registering a salon (INR)
+const REGISTRATION_FEE_INR = 1;
 
+// 1. INITIATE REGISTRATION AND CREATE RAZORPAY ORDER
+export const initiateSalonRegistration = async (req, res) => {
+  try {
+    const { name, location, categories, description } = req.body;
+    const userId = req.user._id;
+
+    console.log("Razorpay Key Status:", {
+      idPresent: !!process.env.RAZORPAY_KEY_ID,
+      secretPresent: !!process.env.RAZORPAY_KEY_SECRET,
+      keyPrefix: process.env.RAZORPAY_KEY_ID?.substring(0, 9)
+    });
+
+    if (!name || !location || !categories) {
+      return res.status(400).json({ success: false, message: "Name, Location, and Categories are strictly mandatory." });
+    }
+
+    // Always create in Pending status initially
+    const newSalon = new Salon({
+      name,
+      location,
+      categories,
+      description: description || "",
+      owner: userId,
+      paymentStatus: "pending",
+      approved: false
+    });
+
+    const savedSalon = await newSalon.save();
+
+    // Create Razorpay order
     const options = {
-      amount: Math.round(Number(amount) * 100),
+      amount: REGISTRATION_FEE_INR * 100, // paise
       currency: "INR",
-      receipt: `rcpt_${Date.now()}`,
-      payment_capture: 1,
+      receipt: `receipt_salon_${savedSalon._id}`,
+      payment_capture: 1, // Auto capture
     };
 
     const order = await razorpay.orders.create(options);
-    return res.json({
+
+    if (!order) {
+      // Cleanup if failed
+      await Salon.findByIdAndDelete(savedSalon._id);
+      console.error("Razorpay Order creation returned null/undefined.");
+      return res.status(500).json({ success: false, message: "Razorpay Order creation failed." });
+    }
+
+    // Attach Provider Order ID to DB securely
+    savedSalon.razorpayOrderId = order.id;
+    await savedSalon.save();
+
+    res.status(200).json({
       success: true,
-      order_id: order.id,
+      orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      key_id: RAZORPAY_KEY_ID,
-      receipt: order.receipt,
+      salonId: savedSalon._id
     });
-  } catch (err) {
-    console.error("createRazorOrder error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Unable to create order" });
+
+  } catch (error) {
+    console.error("Init Registration Error Details:", {
+      status: error.statusCode,
+      errorBody: error.error || error,
+      stack: error.stack
+    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * verifyRazorPaymentAndPlaceOrder
- */
-export const verifyRazorPaymentAndPlaceOrder = async (req, res) => {
+// 2. VERIFY SIGNATURE AND MARK AS PAID
+export const verifySalonRegistration = async (req, res) => {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      orderData,
-    } = req.body;
-    if (
-      !razorpay_order_id ||
-      !razorpay_payment_id ||
-      !razorpay_signature ||
-      !orderData
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing payment details" });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, salonId } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !salonId) {
+      return res.status(400).json({ success: false, message: "Missing Razorpay verification parameters." });
     }
 
-    const generated_signature = crypto
-      .createHmac("sha256", RAZORPAY_KEY_SECRET)
-      .update(razorpay_order_id + "|" + razorpay_payment_id)
+    const payload = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(payload.toString())
       .digest("hex");
 
-    if (generated_signature !== razorpay_signature) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid signature" });
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ success: false, message: "Invalid Signature. Possible tamper attempt." });
     }
 
-    const newOrder = new orderModel({
-      userId: req.body.userId || req.user?._id || orderData.userId || "",
-      items: orderData.items || [],
-      amount: orderData.amount || 0,
-      address: orderData.address || {},
-      status: "Order Placed",
-      paymentMethod: "Razorpay",
-      payment: true,
-      paymentDetails: {
-        razorpay_order_id,
-        razorpay_payment_id,
-        verifiedAt: Date.now(),
+    // Signature is valid. Update Salon to Paid!
+    const updatedSalon = await Salon.findByIdAndUpdate(
+      salonId,
+      {
+        paymentStatus: "paid",
+        razorpayPaymentId: razorpay_payment_id,
       },
-      localRef: `WW-${Date.now()}`,
-      temp: false,
-      date: Date.now(),
-      // We keep these fields as strings/objects in case frontend sends them, 
-      // but we NO LONGER try to update a separate customRequestModel
-      custom: !!orderData.custom,
-      customRequestId: orderData.customRequestId || "",
-      customDetails: orderData.customDetails || null,
-    });
+      { new: true }
+    );
 
-    await newOrder.save();
-
-    // ✅ REMOVED: The block that used to update customRequestModel
-
-    try {
-      await notifyOrderPaid(req, newOrder);
-    } catch (notifyErr) {
-      console.error("notifyOrderPaid error:", notifyErr);
+    if (!updatedSalon) {
+      return res.status(404).json({ success: false, message: "Salon not found after payment." });
     }
 
-    return res.json({
+    res.status(200).json({
       success: true,
-      message: "Payment verified & order placed",
-      order: newOrder,
+      message: "Payment verified successfully! Your salon is now pending admin approval.",
+      salon: updatedSalon
     });
-  } catch (err) {
-    console.error("verifyRazorPaymentAndPlaceOrder error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Verification failed" });
+
+  } catch (error) {
+    console.error("Verify Payment Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * createUpiPaymentLink
- */
-export const createUpiPaymentLink = async (req, res) => {
+// 3. VERIFY BOOKING PAYMENT
+export const verifyBookingPayment = async (req, res) => {
   try {
-    const {
-      address,
-      items,
-      amount,
-      customerName,
-      customerEmail,
-      customerPhone,
-    } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
 
-    const tempOrder = new orderModel({
-      userId: req.body.userId || req.user?._id || "",
-      items: items || [],
-      amount: amount || 0,
-      address: address || {},
-      status: "Order Placed",
-      paymentMethod: "UPI",
-      payment: false,
-      paymentDetails: {},
-      localRef: `TEMP-${Date.now()}`,
-      temp: true,
-      date: Date.now(),
-    });
-    await tempOrder.save();
-
-    let razorResp = null;
-    try {
-      const payload = {
-        amount: Math.round(Number(amount) * 100),
-        currency: "INR",
-        accept_partial: false,
-        reference_id: tempOrder._id.toString(),
-        description: `WowWoolies order ${tempOrder.localRef}`,
-        customer: {
-          name:
-            customerName ||
-            (address && (address.firstName || address.name)) ||
-            "",
-          contact: customerPhone || (address && address.phone) || "",
-          email: customerEmail || (address && address.email) || "",
-        },
-        notify: { sms: true, email: true },
-      };
-
-      razorResp = await razorpay.paymentLink.create(payload);
-    } catch (rErr) {
-      console.warn("Razorpay payment link creation failed:", rErr);
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
+      return res.status(400).json({ success: false, message: "Missing Razorpay verification parameters." });
     }
 
-    return res.json({
-      success: true,
-      message: "UPI order created",
-      order: tempOrder,
-      razorpay: razorResp || {},
-    });
-  } catch (err) {
-    console.error("createUpiPaymentLink error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Unable to create UPI order" });
-  }
-};
-
-/**
- * razorpayWebhook
- */
-export const razorpayWebhook = async (req, res) => {
-  try {
-    const rawBody = req.body;
-    const signature = req.headers["x-razorpay-signature"];
-    if (!signature) {
-      return res.status(400).send("No signature");
-    }
-
-    const generated = crypto
-      .createHmac("sha256", RAZORPAY_WEBHOOK_SECRET)
-      .update(rawBody)
+    const payload = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(payload.toString())
       .digest("hex");
-    if (generated !== signature) {
-      return res.status(400).send("Invalid signature");
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ success: false, message: "Invalid Signature. Possible tamper attempt." });
     }
 
-    const payload = JSON.parse(rawBody.toString());
-    const ev = payload.event;
+    // Signature valid. Confirmed & Paid!
+    const updatedBooking = await (await import("../models/bookingModel.js")).default.findByIdAndUpdate(
+      bookingId,
+      {
+        paymentStatus: "paid",
+        status: "confirmed",
+        razorpayPaymentId: razorpay_payment_id,
+      },
+      { new: true }
+    );
 
-    if (ev === "payment.captured" || ev === "payment.authorized") {
-      const paymentEntity = payload?.payload?.payment?.entity;
-      const order_id = paymentEntity?.order_id; 
-      const reference_id =
-        paymentEntity?.reference_id ||
-        paymentEntity?.notes?.reference_id ||
-        null;
-
-      let foundOrder = null;
-      if (reference_id) {
-        foundOrder = await orderModel.findOne({
-          $or: [{ _id: reference_id }, { localRef: reference_id }],
-        });
-      }
-      if (!foundOrder && order_id) {
-        foundOrder = await orderModel.findOne({
-          "paymentDetails.razorpay_order_id": order_id,
-        });
-      }
-
-      if (foundOrder && !foundOrder.payment) {
-        foundOrder.payment = true;
-        foundOrder.paymentMethod = "Razorpay (webhook)";
-        foundOrder.paymentDetails = foundOrder.paymentDetails || {};
-        foundOrder.paymentDetails.razorpay_payment_id =
-          paymentEntity?.id || "";
-        foundOrder.paymentDetails.verifiedAt = Date.now();
-        foundOrder.status = "Order Placed";
-        foundOrder.temp = false;
-        await foundOrder.save();
-
-        try {
-          await notifyOrderPaid(req, foundOrder);
-        } catch (nErr) {
-          console.error("notifyOrderPaid failed in webhook", nErr);
-        }
-      }
+    if (!updatedBooking) {
+      return res.status(404).json({ success: false, message: "Booking not found after payment." });
     }
 
-    return res.status(200).json({ status: "ok" });
-  } catch (err) {
-    console.error("razorpayWebhook error:", err);
-    return res.status(500).json({ status: "error" });
+    // 4. Real-time notification (ONLINE SUCCESS)
+    const io = req.app.get("io");
+    if (io) {
+      const populated = await Booking.findById(updatedBooking._id)
+        .populate("salon", "name location phone")
+        .populate("service", "name price duration category")
+        .populate("artist", "name email phone")
+        .populate("user", "name email phone");
+
+      if (populated.artist) io.emit(`artist_${populated.artist._id}_new_booking`, populated);
+      io.emit(`salon_${populated.salon._id}_new_booking`, populated);
+      
+      // Automate Email Confirmation
+      sendBookingConfirmation(populated).catch(console.error);
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: "Payment verified successfully! Your appointment is now confirmed.",
+      booking: updatedBooking
+    });
+
+  } catch (error) {
+    console.error("Verify Booking Payment Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-export default {
-  createRazorOrder,
-  verifyRazorPaymentAndPlaceOrder,
-  createUpiPaymentLink,
-  razorpayWebhook,
+// 4. MANUAL PAYMENT CONFIRMATION (For Owner/Artist/Admin)
+export const updateBookingPaymentStatus = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { paymentStatus, paymentMethod } = req.body; // 'paid' or 'pending', optional method
+
+    const Booking = (await import("../models/bookingModel.js")).default;
+    
+    const updateData = { paymentStatus };
+    if (paymentMethod) updateData.paymentMethod = paymentMethod;
+
+    const booking = await Booking.findByIdAndUpdate(bookingId, updateData, { new: true })
+      .populate("user", "name email")
+      .populate("salon", "name")
+      .populate("service", "name");
+
+    if (!booking)
+      return res.status(404).json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, message: `Payment marked as ${paymentStatus}${paymentMethod ? ` via ${paymentMethod}` : ""}`, booking });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

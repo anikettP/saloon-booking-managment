@@ -1,349 +1,241 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
-import { ShopContext } from "../context/ShopContext";
+import React, { useContext, useEffect, useState } from "react";
+import { SalonContext } from "../context/SalonContext";
 import axios from "axios";
 import { toast } from "react-toastify";
-import UserAvatar from "../components/UserAvatar"; 
-import AOS from "aos"; 
-import { Package, ShoppingCart, IndianRupee, Clock, Mail } from 'lucide-react'; 
-
-// Helper function to render loading state placeholder
-const LoadingPlaceholder = ({ height = 'h-5', className = 'w-full' }) => (
-    <div className={`animate-pulse bg-pink-100 rounded ${height} ${className}`}></div>
-);
+import UserAvatar from "../components/UserAvatar";
+import { Mail, Phone, MapPin, Calendar, Edit2, Save, X, User as UserIcon } from "lucide-react";
 
 const Profile = () => {
-    const { token, backendUrl, navigate, currency } = useContext(ShopContext);
+    const { token, backendUrl, user, setUser, loadUser, navigate } = useContext(SalonContext);
 
-    const [user, setUser] = useState(null);
-    const [orders, setOrders] = useState([]); 
-    const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        name: "",
+        phone: "",
+        location: ""
+    });
 
-    // 1. Redirect if not authenticated
     useEffect(() => {
         if (!token) {
             navigate("/login?redirect=/profile");
         }
-        AOS.refresh(); 
-    }, [token, navigate]);
+        if (user) {
+            setFormData({
+                name: user.name || "",
+                phone: user.phone || "",
+                location: user.location || ""
+            });
+        }
+    }, [token, user, navigate]);
 
-    // 2. Data Loading Effect
-    useEffect(() => {
-        const loadData = async () => {
-            if (!token) {
-                setLoading(false);
-                return;
-            }
-            
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        try {
             setLoading(true);
-
-            try {
-                const apiBase = `${backendUrl.replace(/\/$/, "")}/api`;
-
-                const [meRes, normalOrdersRes] = await Promise.all([
-                    axios.get(`${apiBase}/user/me`, { headers: { token } }),
-                    axios.post(
-                        `${apiBase}/order/userorders`,
-                        {},
-                        { headers: { token } }
-                    ),
-                ]);
-
-                // --- Process User Profile ---
-                if (meRes.data.success) {
-                    setUser(meRes.data.user);
-                } else {
-                    // Silent fail or toast
-                    // toast.error(meRes.data.message);
-                }
-
-                // --- Process Orders ---
-                const finalOrders = normalOrdersRes.data.success
-                    ? normalOrdersRes.data.orders || []
-                    : [];
-
-                finalOrders.sort(
-                    (a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime()
-                );
-
-                setOrders(finalOrders);
-                
-            } catch (err) {
-                console.error("Profile load error:", err);
-            } finally {
-                setLoading(false);
+            const res = await axios.put(`${backendUrl}/api/user/profile`, formData, {
+                headers: { authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                toast.success("Profile updated! ✨");
+                setUser(res.data.user);
+                setIsEditing(false);
             }
-        };
-
-        loadData();
-    }, [backendUrl, token, navigate]); 
-
-    // 3. Stats Calculation
-    const stats = useMemo(() => {
-        const totalOrders = orders.length;
-        let totalItems = 0;
-        let totalAmount = 0;
-
-        orders.forEach((order) => {
-            totalAmount += order.amount || 0;
-
-            if (Array.isArray(order.items)) {
-                order.items.forEach((item) => {
-                    totalItems += item.quantity || 1;
-                });
-            }
-        });
-
-        return { totalOrders, totalItems, totalAmount };
-    }, [orders]);
-
-    if (!token) return null; 
-
-    const memberSince = user?.createdAt
-        ? new Date(user.createdAt).toLocaleDateString("en-IN", {
-            year: "numeric",
-            month: "short",
-        })
-        : "N/A";
-    
-    const fullName = user?.name || "User"; 
-    const avatarId = user?._id || fullName;
-
-    const getOrderStatusClass = (status) => {
-        const s = (status || '').toLowerCase();
-        if (s.includes('delivered')) return 'bg-green-100 text-green-700 border-green-200';
-        if (s.includes('shipped') || s.includes('out for delivery')) return 'bg-blue-100 text-blue-700 border-blue-200';
-        if (s.includes('cancelled')) return 'bg-red-100 text-red-700 border-red-200';
-        if (s.includes('placed')) return 'bg-pink-100 text-pink-700 border-pink-200';
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        } catch (err) {
+            toast.error("Failed to update profile");
+        } finally {
+            setLoading(false);
+        }
     };
 
+    if (!user) return <div className="pt-40 text-center">Loading profile...</div>;
+
+    const memberSince = new Date(user.createdAt).toLocaleDateString("en-IN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+    });
+
     return (
-        <section className="pt-40 pb-20 min-h-screen">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <section className="pt-32 pb-24 min-h-screen bg-black text-white relative overflow-hidden">
+            {/* Ambient Background Elements */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gold/5 blur-[120px] -mr-64 -mt-64" />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-white/5 blur-[120px] -ml-64 -mb-64" />
+            
+            <div className="max-w-5xl mx-auto px-6 relative z-10">
                 
-                {/* 1. TITLE SECTION - BRIGHT PINK & PROFESSIONAL */}
-                <div 
-                    className="mb-10 p-8 bg-white rounded-3xl shadow-2xl border border-pink-50 relative overflow-hidden"
-                    data-aos="fade-down"
-                >
-                    {/* Decorative Background Blur */}
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-                    
-                    <div className="relative z-10">
-                        {/* Bright Pink Text with Gradient for Professional Look */}
-                        <h6 className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500 drop-shadow-sm mb-2">
-                            My Profile
-                        </h6>
-                        <p className="text-base text-gray-500 font-medium max-w-lg">
-                            Manage your personal details and view your order history in one place.
-                        </p>
+                {/* Profile Header (High Fidelity) */}
+                <div className="bg-[#111] rounded-[3rem] border border-white/5 overflow-hidden mb-12 shadow-2xl relative group">
+                    <div className="h-40 bg-gradient-to-r from-[#111] via-gold/10 to-[#111] relative">
+                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
                     </div>
-                </div>
-
-                {/* 2. MAIN GRID CONTAINER */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.4fr] gap-6 lg:gap-8">
-                    
-                    {/* LEFT COLUMN: Profile + Stats */}
-                    <div className="space-y-6">
-                        
-                        {/* A. Profile Info CARD */}
-                        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-lg p-6 hover:shadow-xl transition-all duration-300">
-                            <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-3">
-                                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                    Personal Details
-                                </h2>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    Active
-                                </span>
+                    <div className="px-10 pb-12 -mt-20 relative">
+                        <div className="flex flex-col md:flex-row items-end gap-8 mb-10">
+                            <div className="relative">
+                                <div className="w-32 h-32 rounded-[2.5rem] bg-black border-4 border-[#111] shadow-2xl overflow-hidden group-hover:scale-105 transition-transform duration-700">
+                                    <UserAvatar 
+                                        name={user.name} 
+                                        id={user._id} 
+                                        size="xxl" 
+                                        className="w-full h-full object-cover" 
+                                    />
+                                </div>
+                                <button className="absolute bottom-1 right-1 p-2.5 bg-gold text-black rounded-2xl shadow-2xl hover:bg-white transition-all scale-90">
+                                    <Edit2 size={14} />
+                                </button>
                             </div>
-
-                            <div className="flex items-center gap-5">
-                                <UserAvatar name={fullName} id={avatarId} size="xl" className="shadow-lg ring-4 ring-pink-50" />
-                                
-                                <div className="flex-1 min-w-0">
-                                    {/* Using DIV instead of P to avoid console errors */}
-                                    <div className="text-xl sm:text-2xl font-bold text-gray-800 truncate">
-                                        {loading ? <LoadingPlaceholder height="h-8" className="w-4/5" /> : fullName}
-                                    </div>
-                                    <div className="text-sm text-gray-500 truncate mt-1 flex items-center gap-2">
-                                        <Mail className="w-4 h-4 text-pink-400 shrink-0" />
-                                        {loading ? <LoadingPlaceholder height="h-4" className="w-3/4" /> : user?.email || "N/A"}
-                                    </div>
-                                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50 text-pink-700 text-xs font-medium border border-pink-100">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span>Joined {memberSince}</span>
-                                    </div>
+                            <div className="flex-1 pb-2">
+                                <p className="text-gold font-black uppercase tracking-[0.4em] text-[10px] mb-3">Enterprise Profile</p>
+                                <h1 className="text-4xl sm:text-5xl font-black text-white uppercase tracking-tight leading-none mb-4">{user.name}</h1>
+                                <div className="flex gap-3 items-center">
+                                    <span className="text-white/40 font-black uppercase tracking-widest text-[9px] px-5 py-2 bg-black/40 rounded-full border border-white/5">
+                                        ID: {user._id?.slice(-8).toUpperCase()}
+                                    </span>
+                                    <span className="text-gold font-black uppercase tracking-widest text-[9px] px-5 py-2 bg-gold/10 rounded-full border border-gold/20 shadow-2xl">
+                                        {user.role === "salonOwner" ? "Proprietor" : user.role === "artist" ? "Elite Specialist" : "Gold Member"}
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* B. Activity Stats CARD - BRIGHTENED PINK */}
-                        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-lg p-6">
-                            <h2 className="text-xs font-bold text-gray-400 mb-6 uppercase tracking-widest border-b border-gray-100 pb-3">
-                                Account Overview
-                            </h2>
-
-                            {loading ? (
-                                <div className="space-y-3"><LoadingPlaceholder height="h-24" /></div>
-                            ) : (
-                                <div className="grid grid-cols-3 gap-3">
-                                    {/* Stat 1: Orders */}
-                                    <div className="p-4 rounded-2xl bg-pink-50 hover:bg-pink-100 transition-colors border border-gray-100 flex flex-col items-center text-center group">
-                                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mb-2 group-hover:scale-110 transition-transform text-pink-600">
-                                            <Package className="w-5 h-5" />
-                                        </div>
-                                        <p className="text-xl font-bold text-gray-800">{stats.totalOrders}</p>
-                                        <p className="text-[10px] uppercase text-gray-500 font-bold tracking-wide">Orders</p>
-                                    </div>
-
-                                    {/* Stat 2: Items */}
-                                    <div className="p-4 rounded-2xl bg-pink-50 hover:bg-pink-100 transition-colors border border-gray-100 flex flex-col items-center text-center group">
-                                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mb-2 group-hover:scale-110 transition-transform text-pink-600">
-                                            <ShoppingCart className="w-5 h-5" />
-                                        </div>
-                                        <p className="text-xl font-bold text-gray-800">{stats.totalItems}</p>
-                                        <p className="text-[10px] uppercase text-gray-500 font-bold tracking-wide">Items</p>
-                                    </div>
-
-                                    {/* Stat 3: Total Spent */}
-                                    <div className="p-4 rounded-2xl bg-pink-50 hover:bg-pink-100 transition-colors border border-gray-100 flex flex-col items-center text-center group">
-                                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mb-2 group-hover:scale-110 transition-transform text-pink-600">
-                                            <IndianRupee className="w-5 h-5" />
-                                        </div>
-                                        <p className="text-xl font-bold text-gray-800">{stats.totalAmount.toFixed(0)}</p>
-                                        <p className="text-[10px] uppercase text-gray-500 font-bold tracking-wide">Spent</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* RIGHT COLUMN: Recent Orders List - ENHANCED DETAILS */}
-                    <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-lg p-6 flex flex-col h-full">
-                        <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-3">
-                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                Recent Activity
-                            </h2>
-                            <button
-                                onClick={() => navigate("/orders")}
-                                className="text-xs font-bold text-pink-600 hover:text-pink-800 transition-colors hover:underline"
+                            <button 
+                                onClick={() => setIsEditing(!isEditing)}
+                                className={`px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                    isEditing ? "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10" : "bg-white text-black hover:bg-gold shadow-2xl shadow-white/5"
+                                }`}
                             >
-                                View All Orders
+                                {isEditing ? <><X size={16} className="inline mr-2" /> Discard</> : <><Edit2 size={16} className="inline mr-2" /> Modify Profile</>}
                             </button>
                         </div>
 
-                        {loading ? (
-                            <div className="space-y-4">
-                                <LoadingPlaceholder height="h-20" />
-                                <LoadingPlaceholder height="h-20" />
-                                <LoadingPlaceholder height="h-20" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-white/5">
+                            
+                            {/* Personal Details (Boutique Style) */}
+                            <div className="space-y-8">
+                                <h3 className="text-[10px] font-black text-gold/40 uppercase tracking-[0.4em]">Official Credentials</h3>
+                                
+                                <div className="flex items-center gap-6 group/item">
+                                    <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/5 flex items-center justify-center text-white/20 group-hover/item:text-gold group-hover/item:border-gold/30 transition-all duration-500">
+                                        <Mail size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Communication Email</p>
+                                        <p className="text-white font-bold text-sm tracking-tight">{user.email}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-6 group/item">
+                                    <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/5 flex items-center justify-center text-white/20 group-hover/item:text-gold group-hover/item:border-gold/30 transition-all duration-500">
+                                        <Phone size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Contact Backbone</p>
+                                        {isEditing ? (
+                                            <input 
+                                                type="text" 
+                                                value={formData.phone} 
+                                                onChange={e => setFormData({...formData, phone: e.target.value})}
+                                                className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm font-bold focus:ring-1 focus:ring-gold outline-none mt-1 uppercase"
+                                                placeholder="Enter phone"
+                                            />
+                                        ) : (
+                                            <p className="text-white font-bold text-sm tracking-tight">{user.phone || "Not configured"}</p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        ) : orders.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                <Package className="w-12 h-12 text-gray-300 mb-3" />
-                                <p className="text-sm text-gray-500 font-medium">No orders found.</p>
+
+                            {/* Additional Details */}
+                            <div className="space-y-8">
+                                <h3 className="text-[10px] font-black text-gold/40 uppercase tracking-[0.4em]">Environmental Stats</h3>
+                                
+                                <div className="flex items-center gap-6 group/item">
+                                    <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/5 flex items-center justify-center text-white/20 group-hover/item:text-gold group-hover/item:border-gold/30 transition-all duration-500">
+                                        <MapPin size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Elite Sector</p>
+                                        {isEditing ? (
+                                            <input 
+                                                type="text" 
+                                                value={formData.location} 
+                                                onChange={e => setFormData({...formData, location: e.target.value})}
+                                                className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm font-bold focus:ring-1 focus:ring-gold outline-none mt-1 uppercase"
+                                                placeholder="Enter location"
+                                            />
+                                        ) : (
+                                            <p className="text-white font-bold text-sm tracking-tight">{user.location || "Sector Not Set"}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/5 flex items-center justify-center text-white/20">
+                                        <Calendar size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Inducted Since</p>
+                                        <p className="text-white font-bold text-sm tracking-tight uppercase">{memberSince}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {isEditing && (
+                            <div className="mt-12 pt-10 border-t border-white/5 flex justify-end">
                                 <button 
-                                    onClick={()=>navigate('/collection')} 
-                                    className="mt-3 px-4 py-2 bg-pink-600 text-white text-xs font-bold rounded-lg hover:bg-pink-700 transition shadow-md"
+                                    onClick={handleUpdate}
+                                    disabled={loading}
+                                    className="bg-gold text-black px-12 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-3 hover:bg-white transition-all shadow-2xl shadow-gold/10 disabled:opacity-50"
                                 >
-                                    Start Shopping
+                                    {loading ? "Synchronizing..." : <><Save size={18} /> Push Updates</>}
                                 </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                                {orders.slice(0, 5).map((order) => {
-                                    const itemsArray = Array.isArray(order.items) ? order.items : [];
-                                    const firstItem = itemsArray[0] || {};
-                                    // Use a map to build a cleaner list of item names and quantities
-                                    const itemSummary = itemsArray.map(it => `${it.name} (x${it.quantity || 1})`).join(", ");
-                                    const itemCount = itemsArray.reduce((sum, it) => sum + (it.quantity || 1), 0);
-                                    
-                                    const dateObject = new Date(order.date || order.createdAt);
-                                    const dateDisplay = dateObject.toLocaleDateString("en-IN", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                    });
-                                    const timeDisplay = dateObject.toLocaleTimeString("en-IN", {
-                                        hour: '2-digit', minute: '2-digit', hour12: true
-                                    });
-                                    
-                                    const statusClass = getOrderStatusClass(order.status);
-
-                                    return (
-                                        <div
-                                            key={order._id}
-                                            onClick={() => navigate('/orders')}
-                                            className="group relative bg-white border border-gray-100 rounded-xl p-4 hover:border-pink-300 hover:shadow-md transition-all duration-300 cursor-pointer"
-                                        >
-                                            
-                                            {/* TOP ROW: Order Ref, Date, Time & Status */}
-                                            <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-pink-500"></span>
-                                                        <p className="text-sm font-bold text-gray-800 group-hover:text-pink-600 transition-colors">
-                                                            Order #{order._id.slice(-6).toUpperCase()}
-                                                        </p>
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 pl-4 mt-0.5 flex gap-1">
-                                                        <Clock className="w-3 h-3 text-pink-400" />
-                                                        {dateDisplay} at {timeDisplay}
-                                                    </p>
-                                                </div>
-                                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide border ${statusClass} shrink-0`}>
-                                                    {order.status}
-                                                </span>
-                                            </div>
-                                            
-                                            {/* ENHANCED PRODUCT DETAILS ROW */}
-                                            <div className="flex items-center gap-4 py-2">
-                                                <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 shadow-sm">
-                                                    {/* Display the image of the first item in the order */}
-                                                    <img 
-                                                        src={firstItem.image} 
-                                                        alt={firstItem.name || 'Product'} 
-                                                        className="w-full h-full object-cover" 
-                                                        onError={(e) => { e.target.onerror = null; e.target.src = '/images/placeholder.jpg' }} // Fallback image needed
-                                                    />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    {/* Item Name and Quantity */}
-                                                    <p className="text-sm font-bold text-gray-900 truncate" title={firstItem.name}>
-                                                        {firstItem.name || 'Product Name Missing'} 
-                                                        <span className="text-pink-600 font-extrabold ml-2">x{firstItem.quantity || 1}</span>
-                                                        {itemCount > 1 && <span className="text-gray-400 font-normal text-xs ml-2">+ {itemCount - (firstItem.quantity || 1)} more items</span>}
-                                                    </p>
-                                                    
-                                                    {/* Category/Type Metadata */}
-                                                    <p className="text-xs text-gray-500 mt-1 truncate">
-                                                        {firstItem.category && `Category: ${firstItem.category}`}
-                                                        {firstItem.type && ` | Type: ${firstItem.type}`}
-                                                    </p>
-                                                    
-                                                    {/* Full Item Summary */}
-                                                    <p className="text-xs text-gray-400 italic mt-1 truncate" title={itemSummary}>
-                                                        {itemSummary}
-                                                    </p>
-                                                </div>
-                                                
-                                                {/* Total Amount */}
-                                                <div className="flex items-center gap-1 font-bold text-gray-900 text-lg shrink-0">
-                                                    <IndianRupee className="w-5 h-5 text-pink-600" />
-                                                    {order.amount.toFixed(2)}
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    );
-                                })}
                             </div>
                         )}
                     </div>
                 </div>
+
+                {/* Dashboard Navigation Grid (Premium Layout) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div 
+                        onClick={() => navigate("/my-bookings")}
+                        className="bg-[#111] p-8 rounded-[3rem] border border-white/5 hover:border-gold/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer group"
+                    >
+                        <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-500 text-gold border border-gold/10">
+                            <Calendar size={24} />
+                        </div>
+                        <h4 className="font-black text-white text-xl uppercase tracking-tight mb-2">My Sessions</h4>
+                        <p className="text-white/30 text-[9px] font-bold uppercase tracking-widest leading-relaxed">Manage your premium reservations and service history.</p>
+                    </div>
+                    
+                    {user.role === "salonOwner" && (
+                        <div 
+                            onClick={() => navigate("/dashboard")}
+                            className="bg-[#111] p-8 rounded-[3rem] border border-white/5 hover:border-gold/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer group"
+                        >
+                            <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-500 text-gold border border-gold/10">
+                                <Scissors size={24} />
+                            </div>
+                            <h4 className="font-black text-white text-xl uppercase tracking-tight mb-2">Owner Lounge</h4>
+                            <p className="text-white/30 text-[9px] font-bold uppercase tracking-widest leading-relaxed">Manage specialists, services, and live traffic analytics.</p>
+                        </div>
+                    )}
+
+                    {(user.role === "artist" || user.role === "salonOwner") && (
+                        <div 
+                            onClick={() => navigate("/artist-dashboard")}
+                            className="bg-[#111] p-8 rounded-[3rem] border border-white/5 hover:border-gold/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer group"
+                        >
+                            <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-500 text-gold border border-gold/10">
+                                <Sparkles size={24} />
+                            </div>
+                            <h4 className="font-black text-white text-xl uppercase tracking-tight mb-2">Workspace</h4>
+                            <p className="text-white/30 text-[9px] font-bold uppercase tracking-widest leading-relaxed">Update professional availability and live workstation statuses.</p>
+                        </div>
+                    )}
+                </div>
+
             </div>
         </section>
     );
 };
 
-export default Profile;
+export default Profile;

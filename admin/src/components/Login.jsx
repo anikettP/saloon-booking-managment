@@ -1,20 +1,22 @@
 import axios from 'axios'
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { backendUrl } from '../App'
 import { toast } from 'react-toastify'
+import { AdminContext } from '../context/AdminContext'
 
-const Login = ({setToken}) => {
-
+const Login = () => {
+    const { setToken, setRole } = useContext(AdminContext)
     const [email,setEmail] = useState('')
     const [password,setPassword] = useState('')
 
     const onSubmitHandler = async (e) => {
         try {
             e.preventDefault();
-            const response = await axios.post(`${backendUrl}/user/admin`, { email, password })
+            const response = await axios.post(`${backendUrl}/api/user/admin`, { email, password })
 
             if (response.data.success) {
                 setToken(response.data.token)
+                setRole(response.data.role || "admin")
             } else {
                 toast.error(response.data.message)
             }

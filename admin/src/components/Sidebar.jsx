@@ -1,132 +1,69 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { assets } from "../assets/assets";
 
-const SidebarItem = ({ to, icon, label }) => {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors
-         ${
-           isActive
-             ? "bg-black text-white shadow-md"
-             : "text-gray-700 hover:bg-gray-100"
-         }`
-      }
-      title={label}
-    >
-      <div className="w-8 h-8 flex items-center justify-center rounded-md bg-transparent group-hover:bg-gray-100">
-        <img src={icon} alt={label} className="w-5 h-5" />
-      </div>
-      <span className="hidden md:inline-block font-medium">{label}</span>
-    </NavLink>
-  );
-};
+const SidebarItem = ({ to, icon, label, badge }) => (
+  <NavLink
+    to={to}
+    className={({ isActive }) =>
+      `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive
+        ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md"
+        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+      }`
+    }
+    title={label}
+  >
+    <span className="text-lg flex-shrink-0">{icon}</span>
+    <span className="hidden md:inline-block font-medium text-sm flex-1">{label}</span>
+    {badge && (
+      <span className="hidden md:inline-block bg-pink-100 text-pink-600 text-xs px-2 py-0.5 rounded-full font-semibold">
+        {badge}
+      </span>
+    )}
+  </NavLink>
+);
+
+const SectionLabel = ({ label }) => (
+  <p className="hidden md:block text-[10px] font-bold uppercase text-gray-400 tracking-widest px-3 mt-5 mb-2">
+    {label}
+  </p>
+);
 
 const Sidebar = () => {
-  // Fallback for banner icon if specific asset doesn't exist
-  const bannerIcon = assets.image_icon || assets.add_icon;
-
   return (
-    <aside className="w-full md:w-[18%] min-h-screen border-r bg-white flex-shrink-0">
-      <div className="px-4 py-6 flex flex-col gap-4">
-        <div className="mb-4 px-2">
-          <h3 className="text-lg font-semibold">Admin</h3>
-          <p className="text-xs text-gray-500">
-            Manage products, orders & content
-          </p>
+    <aside className="w-[60px] md:w-[220px] min-h-screen border-r bg-white flex-shrink-0 transition-all duration-200">
+      <div className="px-3 py-6 flex flex-col gap-1 h-full">
+
+        {/* Brand (Desktop) */}
+        <div className="hidden md:block mb-6 px-2">
+          <h3 className="text-xl font-black text-gray-900 tracking-tight">Book.My.<span className="text-pink-600">Glow</span></h3>
+          <p className="text-[10px] uppercase font-bold text-gray-400 mt-1 tracking-widest">Global Admin Dashboard</p>
         </div>
 
-        {/* MAIN NAV */}
-        <nav className="flex flex-col gap-2">
-          {/* ✅ ADDED: Dashboard Link at the top */}
-          <SidebarItem to="/dashboard" icon={assets.order_icon} label="Dashboard" />
-          
-          <div className="my-1 border-t border-gray-100"></div>
+        {/* OVERVIEW */}
+        <SectionLabel label="Summary" />
+        <SidebarItem to="/dashboard" icon="📊" label="Stats Overview" />
 
-          <SidebarItem to="/add" icon={assets.add_icon} label="Add Items" />
-          <SidebarItem to="/list" icon={assets.order_icon} label="List Items" />
-          <SidebarItem to="/orders" icon={assets.order_icon} label="Orders" />
-          
-          <div className="my-1 border-t border-gray-100"></div>
-          
-          <SidebarItem to="/banners" icon={bannerIcon} label="Banners" />
-          
-          {/* Banner 2 Link */}
-          <SidebarItem to="/banner2" icon={bannerIcon} label="Banner 2" />
+        {/* SALON NETWORK */}
+        <SectionLabel label="Salon Network" />
+        <SidebarItem to="/salon-approvals" icon="✅" label="Approvals" />
+        <SidebarItem to="/services" icon="✂️" label="All Services" />
+        <SidebarItem to="/artists" icon="👥" label="Artist Directory" />
 
-          <SidebarItem to="/categories" icon={assets.add_icon} label="Categories" />
-          
-          <SidebarItem 
-            to="/testimonials" 
-            icon={assets.order_icon} 
-            label="Testimonials" 
-          />
+        {/* BOOKINGS */}
+        <SectionLabel label="Bookings" />
+        <SidebarItem to="/bookings" icon="📅" label="All Bookings" />
 
-          <div className="my-2 border-t border-gray-100"></div>
-        </nav>
+        {/* CUSTOMER CONTENT */}
+        <SectionLabel label="Customer Content" />
+        <SidebarItem to="/banners" icon="🖼️" label="Home Banners" />
+        <SidebarItem to="/testimonials" icon="⭐" label="Public Reviews" />
 
-        {/* QUICK ACTIONS – DESKTOP */}
-        <div className="mt-auto pt-6">
-          <div className="hidden md:block text-xs text-gray-500 px-2">
-            <p className="mb-1">Quick actions</p>
-            <div className="flex flex-col gap-2">
-              <NavLink
-                to="/add"
-                className="text-sm px-3 py-2 rounded hover:bg-gray-100"
-              >
-                + Add new product
-              </NavLink>
-              <NavLink
-                to="/orders"
-                className="text-sm px-3 py-2 rounded hover:bg-gray-100"
-              >
-                Check orders
-              </NavLink>
-            </div>
-          </div>
+        {/* USER ACCOUNTS */}
+        <SectionLabel label="User Accounts" />
+        <SidebarItem to="/users" icon="👥" label="Platform Users" />
 
-          {/* MOBILE BOTTOM NAV */}
-          <div className="md:hidden flex items-center justify-around border-t pt-3 mt-4">
-             {/* ✅ Added Dashboard to Mobile Menu */}
-            <NavLink to="/dashboard" className="flex flex-col items-center text-gray-600">
-              <img src={assets.order_icon} alt="dash" className="w-6 h-6" />
-              <span className="text-[10px] mt-1">Dash</span>
-            </NavLink>
-
-            <NavLink
-              to="/add"
-              className="flex flex-col items-center text-gray-600"
-            >
-              <img src={assets.add_icon} alt="add" className="w-6 h-6" />
-              <span className="text-[10px] mt-1">Add</span>
-            </NavLink>
-
-            <NavLink
-              to="/list"
-              className="flex flex-col items-center text-gray-600"
-            >
-              <img src={assets.order_icon} alt="list" className="w-6 h-6" />
-              <span className="text-[10px] mt-1">List</span>
-            </NavLink>
-
-            <NavLink
-              to="/orders"
-              className="flex flex-col items-center text-gray-600"
-            >
-              <img src={assets.order_icon} alt="orders" className="w-6 h-6" />
-              <span className="text-[10px] mt-1">Orders</span>
-            </NavLink>
-            
-            <NavLink
-              to="/banner2"
-              className="flex flex-col items-center text-gray-600"
-            >
-              <img src={bannerIcon} alt="banner" className="w-6 h-6" />
-              <span className="text-[10px] mt-1">Banner 2</span>
-            </NavLink>
-          </div>
+        <div className="mt-auto pt-4 border-t border-gray-100 items-center justify-center flex">
+          <p className="text-[10px] hidden md:block font-bold text-gray-400 text-center px-2 uppercase tracking-widest leading-relaxed">Book.My.Glow Platform<br/>Version 2.0.5</p>
         </div>
       </div>
     </aside>

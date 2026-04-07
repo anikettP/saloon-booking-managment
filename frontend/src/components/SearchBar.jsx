@@ -242,7 +242,7 @@ const SearchBar = () => {
           
           {/* Footer Hint - Hidden on mobile to save space */}
           <div className="hidden sm:flex bg-gray-50/80 backdrop-blur-sm px-6 py-2.5 border-t border-gray-100 items-center justify-between text-[10px] text-gray-400">
-             <span className="font-medium tracking-wide">WowWoolies Instant Search</span>
+             <span className="font-medium tracking-wide">Book.My.Glow Instant Search</span>
              <div className="flex gap-4">
                 <span className="flex items-center gap-1.5"><kbd className="font-sans bg-white border border-gray-200 rounded px-1.5 py-0.5 shadow-sm text-gray-500">↑↓</kbd> Navigate</span>
                 <span className="flex items-center gap-1.5"><kbd className="font-sans bg-white border border-gray-200 rounded px-1.5 py-0.5 shadow-sm text-gray-500">↵</kbd> Select</span>
